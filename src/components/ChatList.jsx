@@ -21,6 +21,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     // Listen to chats
     const unsubscribe = listenToChats(user.uid, async (chatsList) => {
       setChats(chatsList);
+      console.log('🔥 chatsList from Firestore:', chatsList);
 
       // Fetch user data for each chat's other participant
       const usersMap = {};
