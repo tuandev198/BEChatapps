@@ -27,12 +27,24 @@ export default function ChatRoom({ chatId, otherUser }) {
       // Reset cache when chat changes
       sendersCacheRef.current = {};
       setSenders({});
+      setMessages([]);
       return;
     }
     
+    console.log('🔍 ChatRoom: Setting up listener for chatId:', chatId);
+    
     const unsub = listenToMessages(chatId, async (list) => {
+      console.log('📨 ChatRoom: Received messages list:', list?.length || 0, list);
+      
+      if (!list || list.length === 0) {
+        console.log('⚠️ ChatRoom: Empty messages list');
+        setMessages([]);
+        return;
+      }
+      
       // Filter out deleted messages (show deleted messages only if they're from current user)
       const filtered = list.filter(m => !m.deleted || m.senderId === user.uid);
+      console.log('✅ ChatRoom: Filtered messages:', filtered.length, 'from', list.length);
       setMessages(filtered);
       
       // Fetch sender data only for new senders
@@ -48,18 +60,24 @@ export default function ChatRoom({ chatId, otherUser }) {
               sendersCacheRef.current[id] = u;
               newSenders[id] = u;
             }
+          } else {
+            // Use cached sender
+            newSenders[id] = sendersCacheRef.current[id];
           }
         })
       );
       
-      // Update state only if there are new senders
+      // Update state with all senders (including cached ones)
       if (Object.keys(newSenders).length > 0) {
         setSenders((prev) => ({ ...prev, ...newSenders }));
       }
     });
     
-    return () => unsub();
-  }, [chatId]);
+    return () => {
+      console.log('🧹 ChatRoom: Cleaning up listener');
+      unsub();
+    };
+  }, [chatId, user.uid]);
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -154,20 +172,23 @@ export default function ChatRoom({ chatId, otherUser }) {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {messages.length === 0 ? (
           <div className="text-center text-slate-400 text-sm mt-10">
-            No messages yet
+            <p>Chưa có tin nhắn nào</p>
+            <p className="text-xs mt-2">Hãy bắt đầu cuộc trò chuyện!</p>
           </div>
         ) : (
-          messages.map(m => (
-            <MessageItem
-              key={m.id}
-              message={m}
-              sender={senders[m.senderId]}
-              chatId={chatId}
-              onReply={handleReply}
-            />
-          ))
+          <>
+            {messages.map(m => (
+              <MessageItem
+                key={m.id}
+                message={m}
+                sender={senders[m.senderId]}
+                chatId={chatId}
+                onReply={handleReply}
+              />
+            ))}
+            <div ref={messagesEndRef} />
+          </>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Reply preview */}

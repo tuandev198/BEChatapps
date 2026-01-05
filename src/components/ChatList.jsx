@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { listenToChats, deleteChat } from '../services/chatService.js';
 import { getUserById } from '../services/friendService.js';
 import { useAuth } from '../context/AuthContext.jsx';

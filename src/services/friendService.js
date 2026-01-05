@@ -13,6 +13,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { db } from './firebase.js';
+import { createNotification, NOTIFICATION_TYPES } from './notificationService.js';
 
 /**
  * Search users by email
@@ -67,6 +68,26 @@ export async function sendFriendRequest(fromUid, toUid) {
     status: 'pending',
     createdAt: serverTimestamp()
   });
+
+  // Create notification for the recipient
+  try {
+    const fromUser = await getUserById(fromUid);
+    if (fromUser) {
+      await createNotification(
+        toUid,
+        NOTIFICATION_TYPES.FRIEND_REQUEST,
+        fromUser.displayName || fromUser.email,
+        'Đã gửi cho bạn lời mời kết bạn',
+        {
+          requestId: docRef.id,
+          fromUid
+        }
+      );
+    }
+  } catch (error) {
+    console.error('Failed to create friend request notification:', error);
+    // Don't fail the request if notification fails
+  }
 
   return docRef.id;
 }
