@@ -15,32 +15,67 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
   const [chats, setChats] = useState(null);
   const [chatUsers, setChatUsers] = useState({});
 
-useEffect(() => {
-  if (!user) return;
+  useEffect(() => {
+    if (!user) {
+      setChats([]);
+      return;
+    }
 
-  const unsubscribe = listenToChats(user.uid, async (chatsList) => {
-    // 🔥 FIX QUAN TRỌNG
-    setChats(chatsList || []);
-    console.log(chatsList)
+    console.log('🔍 ChatList: Starting listener for user:', user.uid);
+    let isMounted = true;
 
-    const usersMap = {};
-    await Promise.all(
-      (chatsList || []).map(async (chat) => {
-        if (chat.otherUid && !usersMap[chat.otherUid]) {
-          const otherUser = await getUserById(chat.otherUid);
-          if (otherUser) {
-            usersMap[chat.otherUid] = otherUser;
-          }
+    const unsubscribe = listenToChats(user.uid, async (chatsList) => {
+      console.log('📦 ChatList: Received chats list:', chatsList?.length || 0, chatsList);
+      
+      if (!isMounted) {
+        console.log('⚠️ ChatList: Component unmounted, ignoring update');
+        return;
+      }
+
+      try {
+        // Always set chats, even if empty
+        setChats(chatsList || []);
+        console.log('✅ ChatList: Set chats state:', chatsList?.length || 0);
+
+        // Fetch user data only for new chats
+        const usersMap = {};
+        await Promise.all(
+          (chatsList || []).map(async (chat) => {
+            console.log('🔍 ChatList: Processing chat:', chat.id, 'otherUid:', chat.otherUid);
+            if (chat.otherUid && !usersMap[chat.otherUid]) {
+              try {
+                const otherUser = await getUserById(chat.otherUid);
+                if (otherUser) {
+                  usersMap[chat.otherUid] = otherUser;
+                  console.log('✅ ChatList: Fetched user:', chat.otherUid, otherUser.displayName);
+                } else {
+                  console.warn('⚠️ ChatList: User not found:', chat.otherUid);
+                }
+              } catch (err) {
+                console.error('❌ ChatList: Failed to fetch user:', chat.otherUid, err);
+              }
+            }
+          })
+        );
+
+        if (isMounted) {
+          setChatUsers(usersMap);
+          console.log('✅ ChatList: Set chatUsers:', Object.keys(usersMap).length);
         }
-      })
-    );
+      } catch (error) {
+        console.error('❌ ChatList: Error processing chats:', error);
+        if (isMounted) {
+          setChats([]);
+        }
+      }
+    });
 
-    setChatUsers(usersMap);
-  });
-
-  return () => unsubscribe();
-}, [user]);
-console.log(chats)
+    return () => {
+      console.log('🧹 ChatList: Cleaning up listener');
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [user]);
 
 
   // ⏳ Đang load

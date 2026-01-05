@@ -15,23 +15,46 @@ export default function ChatRoom({ chatId, otherUser }) {
   const [senders, setSenders] = useState({});
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const sendersCacheRef = useRef({}); // Cache to avoid re-fetching
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   useEffect(() => {
-    if (!chatId) return;
+    if (!chatId) {
+      // Reset cache when chat changes
+      sendersCacheRef.current = {};
+      setSenders({});
+      return;
+    }
+    
     const unsub = listenToMessages(chatId, async (list) => {
       setMessages(list);
+      
+      // Fetch sender data only for new senders
       const ids = [...new Set(list.map(m => m.senderId))];
-      for (const id of ids) {
-        if (!senders[id]) {
-          const u = await getUserById(id);
-          if (u) setSenders(p => ({ ...p, [id]: u }));
-        }
+      const newSenders = {};
+      
+      await Promise.all(
+        ids.map(async (id) => {
+          // Check cache first
+          if (!sendersCacheRef.current[id]) {
+            const u = await getUserById(id);
+            if (u) {
+              sendersCacheRef.current[id] = u;
+              newSenders[id] = u;
+            }
+          }
+        })
+      );
+      
+      // Update state only if there are new senders
+      if (Object.keys(newSenders).length > 0) {
+        setSenders((prev) => ({ ...prev, ...newSenders }));
       }
     });
+    
     return () => unsub();
   }, [chatId]);
 
@@ -53,14 +76,24 @@ export default function ChatRoom({ chatId, otherUser }) {
 
   const handleImageSelect = async (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !chatId) return;
+
     setUploadingImage(true);
     try {
-      const imageURL = await uploadChatImage(chatId, Date.now().toString(), file);
+      const messageId = Date.now().toString();
+      const imageURL = await uploadChatImage(chatId, messageId, file);
       await sendMessage(chatId, user.uid, '', imageURL);
+    } catch (err) {
+      console.error('Failed to upload image:', err);
+      // Show error to user
+      alert(err.code === 'storage/unauthorized' 
+        ? 'Permission denied. Please check Firebase Storage rules.'
+        : err.message || 'Failed to upload image');
     } finally {
       setUploadingImage(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 

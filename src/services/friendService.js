@@ -8,6 +8,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  writeBatch,
   serverTimestamp,
   onSnapshot
 } from 'firebase/firestore';
@@ -78,49 +79,52 @@ export async function sendFriendRequest(fromUid, toUid) {
  * @returns {Promise<void>}
  */
 export async function acceptFriendRequest(requestId, fromUid, toUid) {
-  const batch = [];
+  // Use Firestore batch for atomic operations
+  const batch = writeBatch(db);
   
   // Update request status
   const requestRef = doc(db, 'friend_requests', requestId);
-  batch.push(updateDoc(requestRef, { status: 'accepted' }));
+  batch.update(requestRef, { status: 'accepted' });
 
   // Add to friends array for both users
   const fromUserRef = doc(db, 'users', fromUid);
   const toUserRef = doc(db, 'users', toUid);
   
-  const fromUserSnap = await getDoc(fromUserRef);
-  const toUserSnap = await getDoc(toUserRef);
+  const [fromUserSnap, toUserSnap] = await Promise.all([
+    getDoc(fromUserRef),
+    getDoc(toUserRef)
+  ]);
   
   const fromFriends = fromUserSnap.data()?.friends || [];
   const toFriends = toUserSnap.data()?.friends || [];
 
   if (!fromFriends.includes(toUid)) {
-    batch.push(updateDoc(fromUserRef, {
+    batch.update(fromUserRef, {
       friends: [...fromFriends, toUid]
-    }));
+    });
   }
 
   if (!toFriends.includes(fromUid)) {
-    batch.push(updateDoc(toUserRef, {
+    batch.update(toUserRef, {
       friends: [...toFriends, fromUid]
-    }));
+    });
   }
 
-  // Create chat room
+  // Create chat room if it doesn't exist
   const chatId = [fromUid, toUid].sort().join('_');
   const chatRef = doc(db, 'chats', chatId);
   const chatSnap = await getDoc(chatRef);
   
   if (!chatSnap.exists()) {
-    batch.push(setDoc(chatRef, {
+    batch.set(chatRef, {
       participants: [fromUid, toUid],
       lastMessage: '',
       updatedAt: serverTimestamp()
-    }));
+    });
   }
 
-  // Execute all updates
-  await Promise.all(batch);
+  // Execute all updates atomically
+  await batch.commit();
 }
 
 /**
