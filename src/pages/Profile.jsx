@@ -37,10 +37,7 @@ export default function Profile() {
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
             <ChangeAvatar />
             <div className="flex-1 text-center md:text-left">
-              <h1 className="text-2xl font-bold text-slate-800 mb-2">
-                {profile?.displayName || user?.email || 'Người dùng'}
-              </h1>
-              <div className="text-slate-600 mb-4">{user?.email}</div>
+             
               <div className="flex gap-6 justify-center md:justify-start">
                 <div>
                   <span className="font-semibold text-slate-800">{posts.length}</span>
