@@ -4,6 +4,8 @@ import { uploadChatImage } from '../services/storageService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getUserById } from '../services/friendService.js';
 import MessageItem from './MessageItem.jsx';
+import { Camera } from 'lucide-react';
+
 import EmojiPickerButton from './EmojiPickerButton.jsx';
 
 export default function ChatRoom({ chatId, otherUser }) {
@@ -224,13 +226,15 @@ export default function ChatRoom({ chatId, otherUser }) {
           className="hidden"
         />
 
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="text-xl"
-        >
-          📷
-        </button>
+       <button
+  type="button"
+  onClick={() => fileInputRef.current?.click()}
+  className="p-2 rounded-full text-slate-500 hover:text-indigo-600
+             hover:bg-indigo-50 transition-colors"
+>
+  <Camera className="w-5 h-5" />
+</button>
+
 
         <EmojiPickerButton onEmojiSelect={handleEmojiSelect} />
 

@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { createPost } from '../services/postService.js';
+import { Camera } from 'lucide-react';
 
 export default function CreatePost({ onPostCreated }) {
   const { user } = useAuth();
@@ -9,6 +10,7 @@ export default function CreatePost({ onPostCreated }) {
   const [imagePreview, setImagePreview] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  
   const fileInputRef = useRef(null);
 
   const handleFileSelect = (e) => {
@@ -130,7 +132,7 @@ export default function CreatePost({ onPostCreated }) {
             disabled={uploading}
             className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
           >
-            <span className="text-xl">📷</span>
+            <span className="text-xl"><Camera className="w-5 h-5" /></span>
             <span className="text-sm">Ảnh</span>
           </button>
 

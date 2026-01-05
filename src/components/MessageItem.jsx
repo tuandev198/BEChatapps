@@ -147,7 +147,7 @@ export default function MessageItem({ message, sender, chatId, onReply, onReacti
             </div>
 
             {/* Timestamp and menu */}
-            <div className={`flex items-center gap-2 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
+            <div className={`flex items-center mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
               {message.createdAt && (
                 <span className="text-[11px] text-slate-400">
                   {formatTimestamp(message.createdAt)}
