@@ -9,7 +9,10 @@ import {
   orderBy,
   addDoc,
   updateDoc,
-  serverTimestamp
+  deleteDoc,
+  deleteField,
+  serverTimestamp,
+  writeBatch
 } from 'firebase/firestore';
 import { db } from './firebase.js';
 
@@ -156,15 +159,19 @@ export function listenToMessages(chatId, callback) {
  * @param {string} senderId - Sender UID
  * @param {string} text - Message text
  * @param {string} imageURL - Optional image URL
+ * @param {Object} replyTo - Optional reply to message {id, text, senderId}
  * @returns {Promise<void>}
  */
-export async function sendMessage(chatId, senderId, text, imageURL = null) {
+export async function sendMessage(chatId, senderId, text, imageURL = null, replyTo = null) {
   const messagesRef = collection(db, 'messages', chatId, 'messages');
   
   const messageData = {
     senderId,
     text: text || '',
     imageURL: imageURL || null,
+    replyTo: replyTo || null,
+    reactions: {},
+    deleted: false,
     createdAt: serverTimestamp()
   };
 
@@ -174,6 +181,102 @@ export async function sendMessage(chatId, senderId, text, imageURL = null) {
   const chatRef = doc(db, 'chats', chatId);
   await updateDoc(chatRef, {
     lastMessage: text || 'Image',
+    updatedAt: serverTimestamp()
+  });
+}
+
+/**
+ * Delete a message (mark as deleted)
+ * @param {string} chatId - Chat ID
+ * @param {string} messageId - Message ID
+ * @param {string} senderId - Sender UID (to verify ownership)
+ * @returns {Promise<void>}
+ */
+export async function deleteMessage(chatId, messageId, senderId) {
+  const messageRef = doc(db, 'messages', chatId, 'messages', messageId);
+  const messageSnap = await getDoc(messageRef);
+  
+  if (!messageSnap.exists()) {
+    throw new Error('Message not found');
+  }
+  
+  const messageData = messageSnap.data();
+  if (messageData.senderId !== senderId) {
+    throw new Error('You can only delete your own messages');
+  }
+  
+  // Mark as deleted instead of actually deleting
+  await updateDoc(messageRef, {
+    deleted: true,
+    text: 'Tin nhắn đã được thu hồi',
+    imageURL: deleteField()
+  });
+  
+  // Update chat's lastMessage if this was the last message
+  const chatRef = doc(db, 'chats', chatId);
+  await updateDoc(chatRef, {
+    updatedAt: serverTimestamp()
+  });
+}
+
+/**
+ * Add reaction to a message
+ * @param {string} chatId - Chat ID
+ * @param {string} messageId - Message ID
+ * @param {string} userId - User UID
+ * @param {string} emoji - Emoji reaction
+ * @returns {Promise<void>}
+ */
+export async function addReaction(chatId, messageId, userId, emoji) {
+  const messageRef = doc(db, 'messages', chatId, 'messages', messageId);
+  const messageSnap = await getDoc(messageRef);
+  
+  if (!messageSnap.exists()) {
+    throw new Error('Message not found');
+  }
+  
+  const messageData = messageSnap.data();
+  const reactions = messageData.reactions || {};
+  
+  // Toggle reaction: if user already reacted with this emoji, remove it
+  // Otherwise, add/update the reaction
+  if (reactions[userId] === emoji) {
+    delete reactions[userId];
+  } else {
+    reactions[userId] = emoji;
+  }
+  
+  await updateDoc(messageRef, {
+    reactions: reactions
+  });
+}
+
+/**
+ * Delete a chat (remove from user's view)
+ * @param {string} chatId - Chat ID
+ * @param {string} userId - User UID
+ * @returns {Promise<void>}
+ */
+export async function deleteChat(chatId, userId) {
+  const chatRef = doc(db, 'chats', chatId);
+  const chatSnap = await getDoc(chatRef);
+  
+  if (!chatSnap.exists()) {
+    throw new Error('Chat not found');
+  }
+  
+  const chatData = chatSnap.data();
+  
+  // Remove user from participants (soft delete)
+  // Or you can delete the entire chat if both users agree
+  // For now, we'll mark it as deleted for this user
+  const deletedBy = chatData.deletedBy || [];
+  if (!deletedBy.includes(userId)) {
+    deletedBy.push(userId);
+  }
+  
+  await updateDoc(chatRef, {
+    deletedBy: deletedBy,
     updatedAt: serverTimestamp()
   });
 }

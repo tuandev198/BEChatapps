@@ -13,6 +13,7 @@ export default function ChatRoom({ chatId, otherUser }) {
   const [sending, setSending] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [senders, setSenders] = useState({});
+  const [replyingTo, setReplyingTo] = useState(null);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const sendersCacheRef = useRef({}); // Cache to avoid re-fetching
@@ -30,10 +31,12 @@ export default function ChatRoom({ chatId, otherUser }) {
     }
     
     const unsub = listenToMessages(chatId, async (list) => {
-      setMessages(list);
+      // Filter out deleted messages (show deleted messages only if they're from current user)
+      const filtered = list.filter(m => !m.deleted || m.senderId === user.uid);
+      setMessages(filtered);
       
       // Fetch sender data only for new senders
-      const ids = [...new Set(list.map(m => m.senderId))];
+      const ids = [...new Set(filtered.map(m => m.senderId))];
       const newSenders = {};
       
       await Promise.all(
@@ -63,11 +66,28 @@ export default function ChatRoom({ chatId, otherUser }) {
     if ((!messageText.trim() && !uploadingImage) || sending) return;
     setSending(true);
     try {
-      await sendMessage(chatId, user.uid, messageText.trim());
+      const replyTo = replyingTo ? {
+        id: replyingTo.id,
+        text: replyingTo.text,
+        senderId: replyingTo.senderId
+      } : null;
+      
+      await sendMessage(chatId, user.uid, messageText.trim(), null, replyTo);
       setMessageText('');
+      setReplyingTo(null);
     } finally {
       setSending(false);
     }
+  };
+
+  const handleReply = (message) => {
+    setReplyingTo(message);
+    // Focus input
+    document.querySelector('input[placeholder="Enter message..."]')?.focus();
+  };
+
+  const handleCancelReply = () => {
+    setReplyingTo(null);
   };
 
   const handleEmojiSelect = (emoji) => {
@@ -138,11 +158,37 @@ export default function ChatRoom({ chatId, otherUser }) {
           </div>
         ) : (
           messages.map(m => (
-            <MessageItem key={m.id} message={m} sender={senders[m.senderId]} />
+            <MessageItem
+              key={m.id}
+              message={m}
+              sender={senders[m.senderId]}
+              chatId={chatId}
+              onReply={handleReply}
+            />
           ))
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Reply preview */}
+      {replyingTo && (
+        <div className="px-4 py-2 bg-slate-100 border-l-4 border-indigo-500 flex items-center justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-medium text-slate-600">
+              Đang trả lời {replyingTo.senderId === user.uid ? 'bạn' : senders[replyingTo.senderId]?.displayName || 'người khác'}
+            </div>
+            <div className="text-xs text-slate-500 truncate">
+              {replyingTo.text || 'Tin nhắn đã được thu hồi'}
+            </div>
+          </div>
+          <button
+            onClick={handleCancelReply}
+            className="text-slate-400 hover:text-slate-600 ml-2"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Input */}
       <form
@@ -170,7 +216,7 @@ export default function ChatRoom({ chatId, otherUser }) {
         <input
           value={messageText}
           onChange={e => setMessageText(e.target.value)}
-          placeholder="Enter message..."
+          placeholder={replyingTo ? "Nhập tin nhắn trả lời..." : "Enter message..."}
           className="flex-1 px-4 py-2 rounded-full bg-slate-100 outline-none text-slate-800"
           disabled={sending || uploadingImage}
         />

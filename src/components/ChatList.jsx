@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listenToChats } from '../services/chatService.js';
+import { listenToChats, deleteChat } from '../services/chatService.js';
 import { getUserById } from '../services/friendService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatTimestamp } from '../utils/helpers.js';
@@ -14,6 +14,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
   // ⭐ null = chưa load, [] = đã load nhưng rỗng
   const [chats, setChats] = useState(null);
   const [chatUsers, setChatUsers] = useState({});
+  const [deletingChatId, setDeletingChatId] = useState(null);
 
   useEffect(() => {
     if (!user) {
@@ -96,23 +97,42 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     );
   }
 
+  const handleDeleteChat = async (chatId, e) => {
+    e.stopPropagation();
+    if (!confirm('Bạn có chắc muốn xóa cuộc trò chuyện này?')) return;
+    
+    setDeletingChatId(chatId);
+    try {
+      await deleteChat(chatId, user.uid);
+    } catch (err) {
+      alert(err.message || 'Không thể xóa cuộc trò chuyện');
+    } finally {
+      setDeletingChatId(null);
+    }
+  };
+
   // ✅ Có chat
   return (
     <div className="flex-1 overflow-y-auto bg-[#F6F5FB] px-3 py-4">
-      {chats.map((chat) => {
+      {chats
+        .filter(chat => !chat.deletedBy?.includes(user.uid)) // Filter deleted chats
+        .map((chat) => {
         const otherUser = chatUsers[chat.otherUid];
 
         return (
-          <button
+          <div
             key={chat.id}
-            onClick={() => onSelectChat(chat.id, otherUser)}
-            className={`w-full mb-3 p-3 rounded-2xl text-left transition
+            className={`w-full mb-3 rounded-2xl transition relative group
               ${
                 selectedChatId === chat.id
                   ? 'bg-white shadow ring-2 ring-indigo-400'
                   : 'bg-white hover:shadow-md'
               }`}
           >
+            <button
+              onClick={() => onSelectChat(chat.id, otherUser)}
+              className="w-full p-3 text-left"
+            >
             <div className="flex items-center gap-3">
               {otherUser?.photoURL ? (
                 <img
@@ -144,7 +164,22 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
                 )}
               </div>
             </div>
-          </button>
+            </button>
+            
+            {/* Delete button */}
+            <button
+              onClick={(e) => handleDeleteChat(chat.id, e)}
+              disabled={deletingChatId === chat.id}
+              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50"
+              title="Xóa cuộc trò chuyện"
+            >
+              {deletingChatId === chat.id ? (
+                <span className="text-xs">...</span>
+              ) : (
+                '🗑️'
+              )}
+            </button>
+          </div>
         );
       })}
     </div>
