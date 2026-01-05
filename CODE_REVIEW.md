@@ -123,3 +123,4 @@ export default function ChatRoom({ chatId, otherUser }) {
 
 **Đánh giá tổng thể**: Code tốt, cấu trúc rõ ràng, nhưng cần fix một số vấn đề về performance và memory leaks.
 
+

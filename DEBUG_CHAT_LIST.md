@@ -153,3 +153,4 @@ console.log('Test query result:', snapshot.docs.map(d => d.data()));
 - Code đã có error handling (sẽ show empty array thay vì stuck ở loading)
 - Nếu vẫn không hoạt động, check Browser Console để xem error cụ thể
 
+

@@ -70,3 +70,4 @@ Rules mới cho phép:
 - `write`: Ghi bất kỳ document nào
 - Điều kiện: User phải đã đăng nhập (`request.auth != null`)
 
+

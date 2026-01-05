@@ -214,7 +214,7 @@ export default function ChatRoom({ chatId, otherUser }) {
       {/* Input */}
       <form
         onSubmit={handleSend}
-        className="px-4 py-3 bg-white flex items-center gap-2 flex-shrink-0"
+        className="px-4 py-3 bg-white flex items-center gap-2 flex-shrink-0 mb-20"
       >
         <input
           ref={fileInputRef}

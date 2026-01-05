@@ -80,3 +80,4 @@ Rules mới cho phép:
 
 Nếu file quá lớn hoặc không phải image, sẽ có lỗi validation từ code, không phải từ Storage rules.
 
+
