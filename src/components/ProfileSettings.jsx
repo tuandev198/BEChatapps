@@ -36,7 +36,7 @@ export default function ProfileSettings() {
 
   return (
     <div className="p-4 border-b border-slate-700/50">
-      <h2 className="text-sm font-semibold text-slate-300 mb-4">Profile Settings</h2>
+      <h2 className="text-sm font-semibold text-slate-300 mb-4">Cá nhân</h2>
       
       <ChangeAvatar />
 

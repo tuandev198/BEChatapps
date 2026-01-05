@@ -16,12 +16,10 @@ export default function ChatRoom({ chatId, otherUser }) {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  /* Auto scroll */
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  /* Listen messages */
   useEffect(() => {
     if (!chatId) return;
     const unsub = listenToMessages(chatId, async (list) => {
@@ -68,44 +66,39 @@ export default function ChatRoom({ chatId, otherUser }) {
 
   if (!chatId) {
     return (
-      <div className="flex-1 flex items-center justify-center text-slate-400">
+      <div className="flex-1 flex items-center justify-center text-slate-400 bg-[#F6F5FB]">
         Select a chat to start messaging
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-900">
+    <div className="h-full flex flex-col bg-[#F6F5FB]">
 
       {/* Header */}
-      <div className="px-4 py-3 pt-[env(safe-area-inset-top)] border-b border-slate-700/50 bg-slate-800/30 flex-shrink-0">
+      <div className="px-4 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 flex-shrink-0">
         <div className="flex items-center gap-3">
           {otherUser?.photoURL ? (
             <img src={otherUser.photoURL} className="w-10 h-10 rounded-full" />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-semibold">
+            <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center text-white font-semibold">
               {otherUser?.displayName?.[0]?.toUpperCase() || 'U'}
             </div>
           )}
           <div className="flex-1 min-w-0 leading-tight">
-            <div className="text-sm font-semibold text-slate-200 truncate">
+            <div className="text-sm font-semibold text-white truncate">
               {otherUser?.displayName || otherUser?.email}
             </div>
-            <div className="text-xs text-slate-400 mt-0.5 truncate">
+            <div className="text-xs text-white/70 mt-0.5 truncate">
               {otherUser?.email}
             </div>
           </div>
-          <button
-            className="p-2 rounded-full hover:bg-slate-700/50 text-slate-300 flex-shrink-0"
-            aria-label="Menu"
-          >
-            ⋮
-          </button>
+          <button className="p-2 text-white text-xl">⋮</button>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-2">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {messages.length === 0 ? (
           <div className="text-center text-slate-400 text-sm mt-10">
             No messages yet
@@ -118,48 +111,45 @@ export default function ChatRoom({ chatId, otherUser }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Footer / Input */}
+      {/* Input */}
       <form
         onSubmit={handleSend}
-        className="px-2 py-3 border-t border-slate-700/50 bg-slate-800/30 flex-shrink-0"
+        className="px-4 py-3 bg-white flex items-center gap-2 flex-shrink-0"
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageSelect}
-            className="hidden"
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingImage}
-            className="p-2 text-slate-400 hover:text-slate-200 flex-shrink-0"
-          >
-            📷
-          </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleImageSelect}
+          className="hidden"
+        />
 
-          <EmojiPickerButton onEmojiSelect={handleEmojiSelect} />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="text-xl"
+        >
+          📷
+        </button>
 
-          <input
-            value={messageText}
-            onChange={e => setMessageText(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 min-w-0 px-3 py-2 rounded-full bg-slate-700 text-white outline-none"
-            disabled={sending || uploadingImage}
-          />
+        <EmojiPickerButton onEmojiSelect={handleEmojiSelect} />
 
-          <button
-            type="submit"
-            disabled={!messageText.trim() && !uploadingImage || sending}
-            className="px-4 py-2 rounded-full bg-blue-500 text-white disabled:opacity-50 flex-shrink-0"
-          >
-            Send
-          </button>
-        </div>
+        <input
+          value={messageText}
+          onChange={e => setMessageText(e.target.value)}
+          placeholder="Enter message..."
+          className="flex-1 px-4 py-2 rounded-full bg-slate-100 outline-none text-slate-800"
+          disabled={sending || uploadingImage}
+        />
+
+        <button
+          type="submit"
+          disabled={!messageText.trim() && !uploadingImage || sending}
+          className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center disabled:opacity-50"
+        >
+          ➤
+        </button>
       </form>
-
     </div>
   );
 }

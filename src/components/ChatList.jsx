@@ -7,84 +7,103 @@ import { getInitials } from '../utils/helpers.js';
 
 /**
  * Chat list component showing all user's chats
- * @param {Function} onSelectChat - Callback when a chat is selected
- * @param {string} selectedChatId - Currently selected chat ID
  */
 export default function ChatList({ onSelectChat, selectedChatId }) {
   const { user } = useAuth();
-  const [chats, setChats] = useState([]);
+
+  // ⭐ null = chưa load, [] = đã load nhưng rỗng
+  const [chats, setChats] = useState(null);
   const [chatUsers, setChatUsers] = useState({});
 
-  useEffect(() => {
-    if (!user) return;
+useEffect(() => {
+  if (!user) return;
 
-    // Listen to chats
-    const unsubscribe = listenToChats(user.uid, async (chatsList) => {
-      setChats(chatsList);
-      console.log('🔥 chatsList from Firestore:', chatsList);
+  const unsubscribe = listenToChats(user.uid, async (chatsList) => {
+    // 🔥 FIX QUAN TRỌNG
+    setChats(chatsList || []);
+    console.log(chatsList)
 
-      // Fetch user data for each chat's other participant
-      const usersMap = {};
-      await Promise.all(
-        chatsList.map(async (chat) => {
-          if (chat.otherUid) {
-            const otherUser = await getUserById(chat.otherUid);
-            if (otherUser) {
-              usersMap[chat.otherUid] = otherUser;
-            }
+    const usersMap = {};
+    await Promise.all(
+      (chatsList || []).map(async (chat) => {
+        if (chat.otherUid && !usersMap[chat.otherUid]) {
+          const otherUser = await getUserById(chat.otherUid);
+          if (otherUser) {
+            usersMap[chat.otherUid] = otherUser;
           }
-        })
-      );
-      setChatUsers(usersMap);
-    });
+        }
+      })
+    );
 
-    return () => unsubscribe();
-  }, [user]);
+    setChatUsers(usersMap);
+  });
 
-  if (chats.length === 0) {
+  return () => unsubscribe();
+}, [user]);
+console.log(chats)
+
+
+  // ⏳ Đang load
+  if (chats === null) {
     return (
       <div className="p-4 text-center text-slate-400 text-sm">
-        No chats yet. Start a conversation!
+        Đang tải cuộc trò chuyện...
       </div>
     );
   }
 
+  // 📭 Không có chat
+  if (chats.length === 0) {
+    return (
+      <div className="p-4 text-center text-slate-400 text-sm">
+        Chưa có cuộc trò chuyện nào
+      </div>
+    );
+  }
+
+  // ✅ Có chat
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto bg-[#F6F5FB] px-3 py-4">
       {chats.map((chat) => {
         const otherUser = chatUsers[chat.otherUid];
+
         return (
           <button
             key={chat.id}
             onClick={() => onSelectChat(chat.id, otherUser)}
-            className={`w-full p-3 hover:bg-slate-800/50 transition-colors text-left border-b border-slate-700/50 ${
-              selectedChatId === chat.id ? 'bg-slate-800/70' : ''
-            }`}
+            className={`w-full mb-3 p-3 rounded-2xl text-left transition
+              ${
+                selectedChatId === chat.id
+                  ? 'bg-white shadow ring-2 ring-indigo-400'
+                  : 'bg-white hover:shadow-md'
+              }`}
           >
             <div className="flex items-center gap-3">
               {otherUser?.photoURL ? (
                 <img
                   src={otherUser.photoURL}
                   alt={otherUser.displayName || 'User'}
-                  className="avatar w-12 h-12"
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
+                  className="w-12 h-12 rounded-full object-cover"
                 />
               ) : (
-                <div className="avatar w-12 h-12 bg-gradient-to-br from-cyan-400 to-indigo-500 flex items-center justify-center text-white font-semibold">
-                  {getInitials(otherUser?.displayName || otherUser?.email || 'U')}
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
+                  {getInitials(
+                    otherUser?.displayName || otherUser?.email || 'U'
+                  )}
                 </div>
               )}
+
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-slate-200 truncate">
-                  {otherUser?.displayName || otherUser?.email || 'Unknown User'}
+                <div className="text-sm font-semibold text-slate-800 truncate">
+                  {otherUser?.displayName || otherUser?.email || 'Người dùng'}
                 </div>
+
                 <div className="text-xs text-slate-400 truncate">
-                  {chat.lastMessage || 'No messages yet'}
+                  {chat.lastMessage || 'Chưa có tin nhắn'}
                 </div>
+
                 {chat.updatedAt && (
-                  <div className="text-xs text-slate-500 mt-1">
+                  <div className="text-[11px] text-slate-400 mt-1">
                     {formatTimestamp(chat.updatedAt)}
                   </div>
                 )}
@@ -96,5 +115,3 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     </div>
   );
 }
-
-

@@ -10,8 +10,13 @@ function PrivateRoute({ children }) {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-900 text-slate-100">
-        Loading...
+      <div className="flex h-screen items-center justify-center bg-[#F6F5FB]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin" />
+          <div className="text-sm text-slate-500">
+            Loading your chats...
+          </div>
+        </div>
       </div>
     );
   }
@@ -42,6 +47,3 @@ export default function App() {
     </AuthProvider>
   );
 }
-
-
-

@@ -19,27 +19,25 @@ export default function Register() {
 
     // Validate inputs
     if (!email.trim()) {
-      setError('Email is required');
+      setError('Vui lòng nhập email');
       setLoading(false);
       return;
     }
 
     if (!password || password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError('Mật khẩu phải có ít nhất 6 ký tự');
       setLoading(false);
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
-      setError('Please enter a valid email address');
+      setError('Email không hợp lệ');
       setLoading(false);
       return;
     }
 
     try {
-      // Create user in Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email.trim(),
@@ -47,53 +45,48 @@ export default function Register() {
       );
       const user = userCredential.user;
 
-      // Update display name in Auth profile if provided
       if (displayName.trim()) {
         await updateProfile(user, {
           displayName: displayName.trim()
         });
       }
 
-      // Create user document in Firestore
-      // This must complete before navigation to ensure document exists
       try {
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
           email: user.email,
-          displayName: displayName.trim() || user.email?.split('@')[0] || 'User',
+          displayName:
+            displayName.trim() ||
+            user.email?.split('@')[0] ||
+            'Người dùng',
           photoURL: '',
           friends: [],
           createdAt: serverTimestamp()
         });
       } catch (firestoreError) {
-        // If Firestore write fails, log but don't block registration
-        // AuthContext will handle creating the document as fallback
-        console.warn('Failed to create Firestore user document:', firestoreError);
-        console.warn('User will be created in AuthContext fallback');
+        console.warn(
+          'Không tạo được user Firestore, dùng fallback:',
+          firestoreError
+        );
       }
 
-      // Small delay to ensure Firestore document is created
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 500));
       navigate('/');
     } catch (err) {
-      // Handle specific Firebase errors
-      let errorMessage = 'Failed to create account';
-      
+      let errorMessage = 'Tạo tài khoản thất bại';
+
       if (err.code === 'auth/email-already-in-use') {
-        errorMessage = 'This email is already registered. Please sign in instead.';
+        errorMessage = 'Email đã được đăng ký. Vui lòng đăng nhập.';
       } else if (err.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address';
+        errorMessage = 'Email không hợp lệ';
       } else if (err.code === 'auth/weak-password') {
-        errorMessage = 'Password is too weak. Please use at least 6 characters.';
-      } else if (err.code === 'auth/operation-not-allowed') {
-        errorMessage = 'Email/password authentication is not enabled. Please check Firebase Console.';
+        errorMessage = 'Mật khẩu quá yếu (tối thiểu 6 ký tự)';
       } else if (err.code === 'auth/network-request-failed') {
-        errorMessage = 'Network error. Please check your internet connection.';
+        errorMessage = 'Lỗi mạng. Vui lòng kiểm tra kết nối.';
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
+
       setError(errorMessage);
       console.error('Registration error:', err);
     } finally {
@@ -102,34 +95,34 @@ export default function Register() {
   };
 
   return (
-    <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="glass-panel w-full max-w-md p-8">
-        <h1 className="mb-6 text-center text-3xl font-bold text-slate-100">
-          Sign Up
+    <div className="flex h-screen items-center justify-center bg-[#F6F5FB]">
+      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-lg">
+        <h1 className="mb-6 text-center text-3xl font-bold text-slate-800">
+          Đăng ký
         </h1>
 
         {error && (
-          <div className="mb-4 rounded-lg bg-red-500/20 border border-red-500/50 p-3 text-sm text-red-300">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-300">
-              Display Name
+            <label className="mb-1 block text-sm font-medium text-slate-600">
+              Tên hiển thị
             </label>
             <input
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="input"
-              placeholder="Your name"
+              placeholder="Tên của bạn"
+              className="w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-300">
+            <label className="mb-1 block text-sm font-medium text-slate-600">
               Email
             </label>
             <input
@@ -137,14 +130,14 @@ export default function Register() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="input"
-              placeholder="your@email.com"
+              placeholder="email@example.com"
+              className="w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
             />
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium text-slate-300">
-              Password
+            <label className="mb-1 block text-sm font-medium text-slate-600">
+              Mật khẩu
             </label>
             <input
               type="password"
@@ -152,29 +145,30 @@ export default function Register() {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="input"
               placeholder="••••••••"
+              className="w-full rounded-lg border border-slate-300 px-4 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="btn-primary w-full"
+            className="w-full rounded-lg bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
           >
-            {loading ? 'Creating account...' : 'Sign Up'}
+            {loading ? 'Đang tạo tài khoản...' : 'Đăng ký'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-400">
-          Already have an account?{' '}
-          <Link to="/login" className="text-cyan-400 hover:text-cyan-300">
-            Sign in
+        <p className="mt-6 text-center text-sm text-slate-500">
+          Đã có tài khoản?{' '}
+          <Link
+            to="/login"
+            className="font-medium text-indigo-600 hover:underline"
+          >
+            Đăng nhập
           </Link>
         </p>
       </div>
     </div>
   );
 }
-
-

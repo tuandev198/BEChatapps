@@ -80,7 +80,7 @@ export default function UserSearch() {
 
   return (
     <div className="p-4 border-b border-slate-700/50">
-      <h2 className="text-sm font-semibold text-slate-300 mb-3">Add Friend</h2>
+      <h2 className="text-sm font-semibold text-slate-300 mb-3">Thêm bạn</h2>
       <form onSubmit={handleSearch} className="mb-3">
         <div className="flex gap-2">
           <input
