@@ -35,18 +35,18 @@ export default function ChatRoom({ chatId, otherUser }) {
     
     console.log('🔍 ChatRoom: Setting up listener for chatId:', chatId);
     
+    // Set initial messages to empty array to prevent stuck loading
+    setMessages([]);
+    
     const unsub = listenToMessages(chatId, async (list) => {
       console.log('📨 ChatRoom: Received messages list:', list?.length || 0, list);
       
-      if (!list || list.length === 0) {
-        console.log('⚠️ ChatRoom: Empty messages list');
-        setMessages([]);
-        return;
-      }
+      // Always process the list, even if empty
+      const safeList = Array.isArray(list) ? list : [];
       
       // Filter out deleted messages (show deleted messages only if they're from current user)
-      const filtered = list.filter(m => !m.deleted || m.senderId === user.uid);
-      console.log('✅ ChatRoom: Filtered messages:', filtered.length, 'from', list.length);
+      const filtered = safeList.filter(m => !m.deleted || m.senderId === user.uid);
+      console.log('✅ ChatRoom: Filtered messages:', filtered.length, 'from', safeList.length);
       setMessages(filtered);
       
       // Fetch sender data only for new senders
@@ -57,10 +57,14 @@ export default function ChatRoom({ chatId, otherUser }) {
         ids.map(async (id) => {
           // Check cache first
           if (!sendersCacheRef.current[id]) {
-            const u = await getUserById(id);
-            if (u) {
-              sendersCacheRef.current[id] = u;
-              newSenders[id] = u;
+            try {
+              const u = await getUserById(id);
+              if (u) {
+                sendersCacheRef.current[id] = u;
+                newSenders[id] = u;
+              }
+            } catch (err) {
+              console.error('Failed to fetch sender:', id, err);
             }
           } else {
             // Use cached sender

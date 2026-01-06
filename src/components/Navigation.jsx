@@ -53,15 +53,15 @@ export default function Navigation() {
             <span className="text-xs mt-1 hidden md:block">Tìm kiếm</span>
           </Link>
 
-          {/* <Link to="/chat" className={navItemClass('/chat')} title="Tin nhắn">
+          <Link to="/chat" className={navItemClass('/chat')} title="Tin nhắn">
             <MessageCircle className={iconClass} />
             <span className="text-xs mt-1 hidden md:block">Tin nhắn</span>
-          </Link> */}
-
+          </Link>
+{/* 
           <Link to="/friends" className={navItemClass('/friends')} title="Bạn bè">
             <Users className={iconClass} />
             <span className="text-xs mt-1 hidden md:block">Bạn bè</span>
-          </Link>
+          </Link> */}
 
           {/* Requests (mobile) */}
           {/* <Link

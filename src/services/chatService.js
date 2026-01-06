@@ -41,24 +41,12 @@ export function listenToChats(uid, callback) {
   console.log('🔍 listenToChats: Starting listener for UID:', uid);
   const chatsRef = collection(db, 'chats');
   
-  // Try with orderBy first, fallback if index missing
-  let q;
-  let useOrderBy = true;
-  
-  try {
-    q = query(
-      chatsRef,
-      where('participants', 'array-contains', uid),
-      orderBy('updatedAt', 'desc')
-    );
-  } catch (error) {
-    console.warn('⚠️ listenToChats: OrderBy query failed, using simple query');
-    useOrderBy = false;
-    q = query(
-      chatsRef,
-      where('participants', 'array-contains', uid)
-    );
-  }
+  // Start with simple query (no orderBy) to avoid index requirement
+  // This ensures the listener works immediately
+  let q = query(
+    chatsRef,
+    where('participants', 'array-contains', uid)
+  );
 
   console.log('📡 listenToChats: Setting up onSnapshot listener');
   
@@ -67,7 +55,8 @@ export function listenToChats(uid, callback) {
     async (snapshot) => {
       console.log('📦 listenToChats: Snapshot received:', {
         size: snapshot.size,
-        empty: snapshot.empty
+        empty: snapshot.empty,
+        hasDocs: snapshot.docs.length > 0
       });
       
       try {
@@ -82,33 +71,24 @@ export function listenToChats(uid, callback) {
           };
         });
         
-        // Sort manually if orderBy was not used
-        if (!useOrderBy) {
-          chats.sort((a, b) => {
-            const aTime = a.updatedAt?.toMillis?.() || 0;
-            const bTime = b.updatedAt?.toMillis?.() || 0;
-            return bTime - aTime;
-          });
-        }
+        // Sort manually by updatedAt (newest first)
+        chats.sort((a, b) => {
+          const aTime = a.updatedAt?.toMillis?.() || a.updatedAt?.seconds * 1000 || 0;
+          const bTime = b.updatedAt?.toMillis?.() || b.updatedAt?.seconds * 1000 || 0;
+          return bTime - aTime;
+        });
         
         console.log('✅ listenToChats: Calling callback with', chats.length, 'chats');
         callback(chats);
       } catch (error) {
         console.error('❌ listenToChats: Error processing chats snapshot:', error);
+        // Always call callback, even on error, to prevent stuck loading state
         callback([]);
       }
     },
     (error) => {
       console.error('❌ listenToChats: Firestore snapshot error:', error);
-      // If error is about missing index and we haven't tried without orderBy yet
-      if (error.code === 'failed-precondition' && useOrderBy && error.message?.includes('index')) {
-        console.log('🔄 listenToChats: Index missing, retrying without orderBy');
-        // Don't create nested listener - just call callback with empty array
-        // The component will handle retry if needed
-        callback([]);
-        return;
-      }
-      
+      // Always call callback with empty array on error to prevent stuck loading
       callback([]);
     }
   );
@@ -132,14 +112,9 @@ export function listenToMessages(chatId, callback) {
   console.log('🔍 listenToMessages: Starting listener for chatId:', chatId);
   const messagesRef = collection(db, 'messages', chatId, 'messages');
   
-  // Try with orderBy first, fallback if index missing
-  let q;
-  try {
-    q = query(messagesRef, orderBy('createdAt', 'asc'));
-  } catch (error) {
-    console.warn('⚠️ listenToMessages: OrderBy failed, using simple query:', error);
-    q = query(messagesRef);
-  }
+  // Start with simple query (no orderBy) to avoid index requirement
+  // Sort manually after fetching
+  const q = query(messagesRef);
 
   return onSnapshot(
     q,
@@ -148,7 +123,7 @@ export function listenToMessages(chatId, callback) {
         chatId,
         size: snapshot.size,
         empty: snapshot.empty,
-        docIds: snapshot.docs.map(d => d.id)
+        hasDocs: snapshot.docs.length > 0
       });
       
       const messages = snapshot.docs.map(doc => ({
@@ -156,11 +131,20 @@ export function listenToMessages(chatId, callback) {
         ...doc.data()
       }));
       
+      // Sort manually by createdAt (oldest first)
+      messages.sort((a, b) => {
+        const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
+        const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+        return aTime - bTime;
+      });
+      
       console.log('✅ listenToMessages: Calling callback with', messages.length, 'messages');
+      // Always call callback, even if empty, to prevent stuck loading state
       callback(messages);
     },
     (error) => {
       console.error('❌ listenToMessages: Error:', error);
+      // Always call callback with empty array on error to prevent stuck loading
       callback([]);
     }
   );

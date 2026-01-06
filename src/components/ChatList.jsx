@@ -25,6 +25,9 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     console.log('🔍 ChatList: Starting listener for user:', user.uid);
     let isMounted = true;
 
+    // Set initial state to empty array (not null) to show "no chats" instead of loading
+    setChats([]);
+
     const unsubscribe = listenToChats(user.uid, async (chatsList) => {
       console.log('📦 ChatList: Received chats list:', chatsList?.length || 0, chatsList);
       
@@ -34,14 +37,15 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
       }
 
       try {
-        // Always set chats, even if empty
-        setChats(chatsList || []);
-        console.log('✅ ChatList: Set chats state:', chatsList?.length || 0);
+        // Always set chats, even if empty - this prevents stuck loading state
+        const safeChatsList = Array.isArray(chatsList) ? chatsList : [];
+        setChats(safeChatsList);
+        console.log('✅ ChatList: Set chats state:', safeChatsList.length);
 
         // Fetch user data only for new chats
         const usersMap = {};
         await Promise.all(
-          (chatsList || []).map(async (chat) => {
+          safeChatsList.map(async (chat) => {
             console.log('🔍 ChatList: Processing chat:', chat.id, 'otherUid:', chat.otherUid);
             if (chat.otherUid && !usersMap[chat.otherUid]) {
               try {
@@ -66,6 +70,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
       } catch (error) {
         console.error('❌ ChatList: Error processing chats:', error);
         if (isMounted) {
+          // Set to empty array on error to prevent stuck loading
           setChats([]);
         }
       }
@@ -79,17 +84,8 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
   }, [user]);
 
 
-  // ⏳ Đang load
-  if (chats === null) {
-    return (
-      <div className="p-4 text-center text-slate-400 text-sm">
-        Đang tải cuộc trò chuyện...
-      </div>
-    );
-  }
-
-  // 📭 Không có chat
-  if (chats.length === 0) {
+  // 📭 Không có chat (chats is always an array now, never null)
+  if (!chats || chats.length === 0) {
     return (
       <div className="p-4 text-center text-slate-400 text-sm">
         Chưa có cuộc trò chuyện nào

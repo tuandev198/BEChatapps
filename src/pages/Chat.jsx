@@ -9,19 +9,22 @@ export default function Chat() {
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [selectedOtherUser, setSelectedOtherUser] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true); // Desktop: mặc định mở
 
   // Get chatId and otherUser from navigation state (when coming from Friends page)
   useEffect(() => {
     if (location.state?.chatId && location.state?.otherUser) {
       setSelectedChatId(location.state.chatId);
       setSelectedOtherUser(location.state.otherUser);
+      setSidebarOpen(false); // Đóng sidebar khi có chat được chọn
     }
   }, [location.state]);
 
   const handleSelectChat = (chatId, otherUser) => {
     setSelectedChatId(chatId);
     setSelectedOtherUser(otherUser);
-    setMenuOpen(false);
+    setMenuOpen(false); // Đóng mobile menu
+    setSidebarOpen(false); // Đóng sidebar để hiển thị chat full screen
   };
 
   return (
@@ -31,15 +34,23 @@ export default function Chat() {
       {/* ================= SIDEBAR TRÁI ================= */}
       <aside
         className={`
-          fixed md:static z-40 h-full w-72 bg-white shadow-sm border-r border-slate-200
-          transform transition-transform duration-300
+          fixed md:absolute z-40 h-full w-72 bg-white shadow-sm border-r border-slate-200
+          transform transition-transform duration-300 ease-in-out
           ${menuOpen ? 'translate-x-0' : '-translate-x-full'}
-          md:translate-x-0
+          ${sidebarOpen ? 'md:translate-x-0' : 'md:-translate-x-full'}
         `}
       >
         {/* Header sidebar */}
         <div className="h-14 flex items-center justify-between px-4 border-b border-slate-200">
           <span className="font-semibold text-indigo-600">Tin nhắn</span>
+          {/* Nút đóng sidebar trên desktop */}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="hidden md:block text-slate-500 hover:text-slate-700 text-xl"
+            title="Đóng menu"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Chat List */}
@@ -60,12 +71,18 @@ export default function Chat() {
       )}
 
       {/* ================= KHU VỰC CHAT ================= */}
-      <main className="flex-1 flex flex-col">
-        {/* TOP BAR MOBILE */}
-        <div className="h-14 flex items-center px-4 border-b border-slate-200 md:hidden bg-white">
+      <main className="flex-1 flex flex-col md:transition-all md:duration-300">
+        {/* TOP BAR - Hiển thị trên cả mobile và desktop khi sidebar đóng */}
+        <div className={`h-14 flex items-center px-4 border-b border-slate-200 bg-white ${
+          sidebarOpen ? 'md:hidden' : ''
+        }`}>
           <button
-            onClick={() => setMenuOpen(true)}
+            onClick={() => {
+              setMenuOpen(true);
+              setSidebarOpen(true);
+            }}
             className="mr-3 text-xl text-indigo-600"
+            title="Mở menu"
           >
             ☰
           </button>
@@ -83,10 +100,18 @@ export default function Chat() {
               otherUser={selectedOtherUser}
             />
           ) : (
-            <div className="h-full flex items-center justify-center text-slate-400">
-              <div className="text-center">
-                <p className="text-lg mb-2">Chọn cuộc trò chuyện để bắt đầu</p>
-                <p className="text-sm">Hoặc tìm bạn bè để nhắn tin</p>
+            // Hiển thị danh sách trò chuyện khi chưa chọn chat
+            <div className="h-full overflow-y-auto bg-[#F6F5FB]">
+              {/* Header khi chưa chọn chat */}
+              <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3">
+                <h2 className="font-semibold text-slate-800">Cuộc trò chuyện</h2>
+              </div>
+              {/* Danh sách trò chuyện */}
+              <div className="px-3 py-4">
+                <ChatList
+                  onSelectChat={handleSelectChat}
+                  selectedChatId={selectedChatId}
+                />
               </div>
             </div>
           )}
