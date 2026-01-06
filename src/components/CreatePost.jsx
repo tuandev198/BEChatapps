@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { createPost } from '../services/postService.js';
 import { Camera } from 'lucide-react';
+import { LoadingSpinner } from './Loading.jsx';
 
 export default function CreatePost({ onPostCreated }) {
   const { user } = useAuth();
@@ -147,8 +148,9 @@ export default function CreatePost({ onPostCreated }) {
           <button
             type="submit"
             disabled={uploading || (!imageFile && !caption.trim())}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
+            {uploading && <LoadingSpinner size="sm" />}
             {uploading ? 'Đang đăng...' : 'Đăng'}
           </button>
         </div>

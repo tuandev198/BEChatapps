@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../services/firebase.js';
+import { LoadingSpinner } from '../components/Loading.jsx';
 
 export default function Register() {
   const [email, setEmail] = useState('');
@@ -153,8 +154,9 @@ export default function Register() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="w-full rounded-lg bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
+            {loading && <LoadingSpinner size="sm" />}
             {loading ? 'Đang tạo tài khoản...' : 'Đăng ký'}
           </button>
         </form>

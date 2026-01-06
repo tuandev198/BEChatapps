@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { listenToFriendsStories, getUserStories } from '../services/storyService.js';
+import { listenToFriendsStories, listenToUserStories } from '../services/storyService.js';
 import { getUserById } from '../services/friendService.js';
 import { getInitials } from '../utils/helpers.js';
 import { Plus, Play } from 'lucide-react';
@@ -17,12 +17,29 @@ export default function StoryBar({ onStoryClick, onCreateStory }) {
   useEffect(() => {
     if (!user || !profile) return;
 
-    // Get my stories
-    getUserStories(user.uid).then(setMyStories);
+    console.log('🔍 StoryBar: Setting up listeners for user:', user.uid);
+
+    // Listen to my stories (real-time)
+    const unsubscribeMyStories = listenToUserStories(user.uid, (stories) => {
+      console.log('📸 StoryBar: My stories updated:', stories.length);
+      setMyStories(stories);
+      
+      // Add my user data to storyUsers
+      setStoryUsers(prev => ({
+        ...prev,
+        [user.uid]: {
+          uid: user.uid,
+          email: user.email,
+          displayName: profile.displayName || user.email,
+          photoURL: profile.photoURL || ''
+        }
+      }));
+    });
 
     // Listen to friends' stories
     const friendIds = profile.friends || [];
-    const unsubscribe = listenToFriendsStories(friendIds, async (stories) => {
+    const unsubscribeFriends = listenToFriendsStories(friendIds, async (stories) => {
+      console.log('👥 StoryBar: Friends stories updated:', stories.length);
       setFriendsStories(stories);
 
       // Fetch user data for stories
@@ -41,13 +58,24 @@ export default function StoryBar({ onStoryClick, onCreateStory }) {
       setStoryUsers(usersMap);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeMyStories();
+      unsubscribeFriends();
+    };
   }, [user, profile]);
 
   const allStories = [
     ...(myStories.length > 0 ? [{ userId: user.uid, stories: myStories, isMe: true }] : []),
     ...friendsStories.map(s => ({ ...s, isMe: false }))
   ];
+
+  console.log('📊 StoryBar: Render state:', {
+    myStoriesCount: myStories.length,
+    friendsStoriesCount: friendsStories.length,
+    allStoriesCount: allStories.length,
+    myStories: myStories,
+    user: user?.uid
+  });
 
   if (allStories.length === 0) {
     return (

@@ -5,6 +5,7 @@ import Post from '../components/Post.jsx';
 import ChangeAvatar from '../components/ChangeAvatar.jsx';
 import Navigation from '../components/Navigation.jsx';
 import { Link } from 'react-router-dom';
+import { SkeletonLoader } from '../components/Loading.jsx';
 
 export default function Profile() {
   const { user, profile } = useAuth();
@@ -80,7 +81,13 @@ export default function Profile() {
 
         {/* Posts */}
         {loading ? (
-          <div className="text-center text-slate-400 py-12">Đang tải...</div>
+          <div className="space-y-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-white rounded-2xl p-4">
+                <SkeletonLoader lines={3} />
+              </div>
+            ))}
+          </div>
         ) : posts.length === 0 ? (
           <div className="text-center text-slate-400 py-12">
             <p className="text-lg mb-2">Chưa có bài viết nào</p>

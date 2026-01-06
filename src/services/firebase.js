@@ -14,14 +14,38 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Khởi tạo app Firebase duy nhất cho toàn bộ frontend
-const app = initializeApp(firebaseConfig);
+// Kiểm tra Firebase config
+if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+  console.error('❌ Firebase config missing! Please check your .env file.');
+  console.error('Required variables:', {
+    VITE_FIREBASE_API_KEY: !!firebaseConfig.apiKey,
+    VITE_FIREBASE_AUTH_DOMAIN: !!firebaseConfig.authDomain,
+    VITE_FIREBASE_PROJECT_ID: !!firebaseConfig.projectId,
+    VITE_FIREBASE_STORAGE_BUCKET: !!firebaseConfig.storageBucket,
+    VITE_FIREBASE_MESSAGING_SENDER_ID: !!firebaseConfig.messagingSenderId,
+    VITE_FIREBASE_APP_ID: !!firebaseConfig.appId
+  });
+}
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+let app;
+let auth;
+let db;
+let storage;
 
+try {
+  // Khởi tạo app Firebase duy nhất cho toàn bộ frontend
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  storage = getStorage(app);
+  console.log('✅ Firebase initialized successfully');
+} catch (error) {
+  console.error('❌ Firebase initialization error:', error);
+  // Tạo fallback để app không crash hoàn toàn
+  app = null;
+  auth = null;
+  db = null;
+  storage = null;
+}
 
-
-
-
+export { auth, db, storage };

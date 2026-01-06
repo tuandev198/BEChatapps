@@ -4,6 +4,7 @@ import { getUserById } from '../services/friendService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatTimestamp } from '../utils/helpers.js';
 import { getInitials } from '../utils/helpers.js';
+import { Loading, SkeletonLoader } from './Loading.jsx';
 
 /**
  * Chat list component showing all user's chats
@@ -15,6 +16,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
   const [chats, setChats] = useState(null);
   const [chatUsers, setChatUsers] = useState({});
   const [deletingChatId, setDeletingChatId] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
@@ -25,7 +27,8 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     console.log('🔍 ChatList: Starting listener for user:', user.uid);
     let isMounted = true;
 
-    // Set initial state to empty array (not null) to show "no chats" instead of loading
+    // Set loading state
+    setLoading(true);
     setChats([]);
 
     const unsubscribe = listenToChats(user.uid, async (chatsList) => {
@@ -40,6 +43,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
         // Always set chats, even if empty - this prevents stuck loading state
         const safeChatsList = Array.isArray(chatsList) ? chatsList : [];
         setChats(safeChatsList);
+        setLoading(false);
         console.log('✅ ChatList: Set chats state:', safeChatsList.length);
 
         // Fetch user data only for new chats
@@ -67,11 +71,12 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
           setChatUsers(usersMap);
           console.log('✅ ChatList: Set chatUsers:', Object.keys(usersMap).length);
         }
-      } catch (error) {
+        } catch (error) {
         console.error('❌ ChatList: Error processing chats:', error);
         if (isMounted) {
           // Set to empty array on error to prevent stuck loading
           setChats([]);
+          setLoading(false);
         }
       }
     });
@@ -84,8 +89,21 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
   }, [user]);
 
 
-  // 📭 Không có chat (chats is always an array now, never null)
-  if (!chats || chats.length === 0) {
+  // Loading state
+  if (loading || chats === null) {
+    return (
+      <div className="p-4 space-y-3">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="bg-white rounded-2xl p-3">
+            <SkeletonLoader lines={2} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // 📭 Không có chat
+  if (chats.length === 0) {
     return (
       <div className="p-4 text-center text-slate-400 text-sm">
         Chưa có cuộc trò chuyện nào

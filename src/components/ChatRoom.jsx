@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { getUserById } from '../services/friendService.js';
 import MessageItem from './MessageItem.jsx';
 import { Camera } from 'lucide-react';
-
+import { Loading, LoadingSpinner } from './Loading.jsx';
 import EmojiPickerButton from './EmojiPickerButton.jsx';
 
 export default function ChatRoom({ chatId, otherUser }) {
@@ -14,6 +14,7 @@ export default function ChatRoom({ chatId, otherUser }) {
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [senders, setSenders] = useState({});
   const [replyingTo, setReplyingTo] = useState(null);
   const messagesEndRef = useRef(null);
@@ -35,7 +36,8 @@ export default function ChatRoom({ chatId, otherUser }) {
     
     console.log('🔍 ChatRoom: Setting up listener for chatId:', chatId);
     
-    // Set initial messages to empty array to prevent stuck loading
+    // Set loading state
+    setLoading(true);
     setMessages([]);
     
     const unsub = listenToMessages(chatId, async (list) => {
@@ -48,6 +50,7 @@ export default function ChatRoom({ chatId, otherUser }) {
       const filtered = safeList.filter(m => !m.deleted || m.senderId === user.uid);
       console.log('✅ ChatRoom: Filtered messages:', filtered.length, 'from', safeList.length);
       setMessages(filtered);
+      setLoading(false);
       
       // Fetch sender data only for new senders
       const ids = [...new Set(filtered.map(m => m.senderId))];
@@ -175,27 +178,31 @@ export default function ChatRoom({ chatId, otherUser }) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        {messages.length === 0 ? (
-          <div className="text-center text-slate-400 text-sm mt-10">
-            <p>Chưa có tin nhắn nào</p>
-            <p className="text-xs mt-2">Hãy bắt đầu cuộc trò chuyện!</p>
+          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+            {loading ? (
+              <div className="flex items-center justify-center h-full">
+                <Loading text="Đang tải tin nhắn..." />
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="text-center text-slate-400 text-sm mt-10">
+                <p>Chưa có tin nhắn nào</p>
+                <p className="text-xs mt-2">Hãy bắt đầu cuộc trò chuyện!</p>
+              </div>
+            ) : (
+              <>
+                {messages.map(m => (
+                  <MessageItem
+                    key={m.id}
+                    message={m}
+                    sender={senders[m.senderId]}
+                    chatId={chatId}
+                    onReply={handleReply}
+                  />
+                ))}
+                <div ref={messagesEndRef} />
+              </>
+            )}
           </div>
-        ) : (
-          <>
-            {messages.map(m => (
-              <MessageItem
-                key={m.id}
-                message={m}
-                sender={senders[m.senderId]}
-                chatId={chatId}
-                onReply={handleReply}
-              />
-            ))}
-            <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
 
       {/* Reply preview */}
       {replyingTo && (
@@ -250,13 +257,13 @@ export default function ChatRoom({ chatId, otherUser }) {
           disabled={sending || uploadingImage}
         />
 
-        <button
-          type="submit"
-          disabled={!messageText.trim() && !uploadingImage || sending}
-          className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center disabled:opacity-50"
-        >
-          ➤
-        </button>
+            <button
+              type="submit"
+              disabled={!messageText.trim() && !uploadingImage || sending}
+              className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {sending ? <LoadingSpinner size="sm" /> : '➤'}
+            </button>
       </form>
     </div>
   );

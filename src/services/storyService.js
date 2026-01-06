@@ -83,19 +83,127 @@ export async function createStory(userId, mediaFile, caption = '') {
  * @returns {Promise<Array>} Array of story documents
  */
 export async function getUserStories(userId) {
+  if (!userId) return [];
+
   const storiesRef = collection(db, 'stories');
+  // Use simple query without orderBy to avoid index requirement
   const q = query(
     storiesRef,
-    where('userId', '==', userId),
-    where('expiresAt', '>', Timestamp.now()),
-    orderBy('expiresAt', 'desc')
+    where('userId', '==', userId)
   );
 
   const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  }));
+  const now = Timestamp.now();
+  
+  const stories = snapshot.docs
+    .map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }))
+    .filter(story => {
+      // Filter expired stories manually
+      const expiresAt = story.expiresAt;
+      if (!expiresAt) return false;
+      const expiresTime = expiresAt.toMillis ? expiresAt.toMillis() : expiresAt.seconds * 1000;
+      return expiresTime > Date.now();
+    })
+    .sort((a, b) => {
+      // Sort by createdAt (newest first)
+      const aTime = a.createdAt?.toMillis?.() || a.createdAt?.seconds * 1000 || 0;
+      const bTime = b.createdAt?.toMillis?.() || b.createdAt?.seconds * 1000 || 0;
+      return bTime - aTime;
+    });
+
+  return stories;
+}
+
+/**
+ * Listen to user's stories (real-time)
+ * @param {string} userId - User UID
+ * @param {Function} callback - Callback function
+ * @returns {Function} Unsubscribe function
+ */
+export function listenToUserStories(userId, callback) {
+  if (!userId) {
+    callback([]);
+    return () => {};
+  }
+
+  console.log('🔍 listenToUserStories: Setting up listener for userId:', userId);
+
+  const storiesRef = collection(db, 'stories');
+  const q = query(
+    storiesRef,
+    where('userId', '==', userId)
+  );
+
+  return onSnapshot(q, (snapshot) => {
+    console.log('📦 listenToUserStories: Snapshot received:', {
+      userId,
+      size: snapshot.size,
+      empty: snapshot.empty
+    });
+
+    const now = Date.now();
+    
+    const stories = snapshot.docs
+      .map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data
+        };
+      })
+      .filter(story => {
+        // Filter expired stories manually
+        const expiresAt = story.expiresAt;
+        if (!expiresAt) {
+          console.warn('⚠️ Story missing expiresAt:', story.id);
+          return false;
+        }
+        
+        let expiresTime;
+        if (expiresAt.toMillis) {
+          expiresTime = expiresAt.toMillis();
+        } else if (expiresAt.seconds) {
+          expiresTime = expiresAt.seconds * 1000;
+        } else {
+          console.warn('⚠️ Story expiresAt format unknown:', story.id, expiresAt);
+          return false;
+        }
+        
+        const isValid = expiresTime > now;
+        if (!isValid) {
+          console.log('⏰ Story expired:', story.id, 'expiresAt:', new Date(expiresTime), 'now:', new Date(now));
+        }
+        return isValid;
+      })
+      .sort((a, b) => {
+        // Sort by createdAt (newest first)
+        let aTime = 0;
+        let bTime = 0;
+        
+        if (a.createdAt?.toMillis) {
+          aTime = a.createdAt.toMillis();
+        } else if (a.createdAt?.seconds) {
+          aTime = a.createdAt.seconds * 1000;
+        }
+        
+        if (b.createdAt?.toMillis) {
+          bTime = b.createdAt.toMillis();
+        } else if (b.createdAt?.seconds) {
+          bTime = b.createdAt.seconds * 1000;
+        }
+        
+        return bTime - aTime;
+      });
+
+    console.log('✅ listenToUserStories: Filtered stories:', stories.length, 'from', snapshot.size);
+    callback(stories);
+  }, (error) => {
+    console.error('❌ listenToUserStories: Error:', error);
+    callback([]);
+  });
 }
 
 /**

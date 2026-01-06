@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { markStoryAsViewed } from '../services/storyService.js';
+import { markStoryAsViewed, deleteStory } from '../services/storyService.js';
 import { getUserById } from '../services/friendService.js';
-import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Trash2, MoreVertical } from 'lucide-react';
 import { formatTimestamp } from '../utils/helpers.js';
 
 /**
@@ -14,17 +14,21 @@ export default function StoryViewer({
   userId, 
   stories,
   onNextUser,
-  onPrevUser 
+  onPrevUser,
+  onStoryDeleted
 }) {
   const { user } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [storyUser, setStoryUser] = useState(null);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [showDeleteMenu, setShowDeleteMenu] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const progressIntervalRef = useRef(null);
   const videoRef = useRef(null);
 
   const currentStory = stories[currentIndex];
+  const isMyStory = userId === user?.uid;
 
   useEffect(() => {
     if (!isOpen || !userId) return;
@@ -46,8 +50,8 @@ export default function StoryViewer({
       return;
     }
 
-    // Mark as viewed
-    if (currentStory && user && !currentStory.views?.includes(user.uid)) {
+    // Mark as viewed (only for other users' stories)
+    if (currentStory && user && !isMyStory && !currentStory.views?.includes(user.uid)) {
       markStoryAsViewed(currentStory.id, user.uid);
     }
 
@@ -71,7 +75,7 @@ export default function StoryViewer({
         clearInterval(progressIntervalRef.current);
       }
     };
-  }, [isOpen, currentIndex, currentStory, isPaused]);
+  }, [isOpen, currentIndex, currentStory, isPaused, isMyStory, user]);
 
   const handleNext = () => {
     if (currentIndex < stories.length - 1) {
@@ -123,6 +127,41 @@ export default function StoryViewer({
     }
   };
 
+  const handleDeleteStory = async () => {
+    if (!currentStory || !user || deleting) return;
+
+    if (!confirm('Bạn có chắc muốn xóa story này?')) {
+      setShowDeleteMenu(false);
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await deleteStory(currentStory.id, user.uid);
+      
+      // Remove deleted story from list
+      const updatedStories = stories.filter(s => s.id !== currentStory.id);
+      
+      if (updatedStories.length === 0) {
+        // No more stories, close viewer
+        onStoryDeleted?.();
+        onClose();
+      } else {
+        // Move to next story or previous
+        if (currentIndex >= updatedStories.length) {
+          setCurrentIndex(updatedStories.length - 1);
+        }
+        onStoryDeleted?.(updatedStories);
+      }
+      
+      setShowDeleteMenu(false);
+    } catch (err) {
+      alert(err.message || 'Không thể xóa story');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (!isOpen || !currentStory) return null;
 
   return (
@@ -163,6 +202,7 @@ export default function StoryViewer({
           <div>
             <div className="text-white font-semibold">
               {storyUser?.displayName || storyUser?.email || 'User'}
+              {isMyStory && <span className="text-white/70 text-xs ml-2">(Của bạn)</span>}
             </div>
             {currentStory.createdAt && (
               <div className="text-white/70 text-xs">
@@ -172,12 +212,52 @@ export default function StoryViewer({
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
-        >
-          <X className="w-5 h-5 text-white" />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Delete button - chỉ hiển thị khi xem story của chính mình */}
+          {isMyStory && (
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDeleteMenu(!showDeleteMenu);
+                }}
+                className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+                title="Xóa story"
+              >
+                <MoreVertical className="w-5 h-5 text-white" />
+              </button>
+
+              {showDeleteMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowDeleteMenu(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-2 bg-white rounded-lg shadow-xl border border-slate-200 py-1 z-50 min-w-[150px]">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteStory();
+                      }}
+                      disabled={deleting}
+                      className="w-full flex items-center gap-2 px-4 py-2 hover:bg-red-50 text-red-600 transition-colors disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span className="text-sm">{deleting ? 'Đang xóa...' : 'Xóa story'}</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+        </div>
       </div>
 
       {/* Story content */}

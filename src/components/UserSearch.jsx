@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { searchUsersByEmail, sendFriendRequest } from '../services/friendService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getInitials } from '../utils/helpers.js';
+import { LoadingSpinner } from './Loading.jsx';
 
 export default function UserSearch() {
   const { user, profile } = useAuth();
@@ -78,10 +79,12 @@ export default function UserSearch() {
               rounded-xl px-4 text-sm font-medium text-white
               bg-[rgb(79_70_229)]
               hover:bg-[rgb(79_70_229/0.9)]
-              disabled:opacity-50
+              disabled:opacity-50 disabled:cursor-not-allowed
+              flex items-center justify-center gap-2
             "
           >
-            {searching ? '...' : 'Search'}
+            {searching && <LoadingSpinner size="sm" />}
+            {searching ? 'Đang tìm...' : 'Tìm kiếm'}
           </button>
         </div>
       </form>
@@ -146,10 +149,12 @@ export default function UserSearch() {
                   text-sm px-3 py-1.5 rounded-lg text-white
                   bg-[rgb(79_70_229)]
                   hover:bg-[rgb(79_70_229/0.9)]
-                  disabled:opacity-50
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  flex items-center justify-center gap-1
                 "
               >
-                {sending[result.id] ? 'Sending...' : 'Add'}
+                {sending[result.id] && <LoadingSpinner size="sm" />}
+                {sending[result.id] ? 'Đang gửi...' : 'Thêm bạn'}
               </button>
             </div>
           ))}

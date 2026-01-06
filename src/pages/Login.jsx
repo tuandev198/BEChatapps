@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebase.js';
+import { LoadingSpinner } from '../components/Loading.jsx';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -70,8 +71,9 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className="w-full rounded-lg bg-indigo-600 py-2 font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
+            {loading && <LoadingSpinner size="sm" />}
             {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
         </form>

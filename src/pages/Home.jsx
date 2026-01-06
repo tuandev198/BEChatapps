@@ -9,7 +9,8 @@ import CreateStory from '../components/CreateStory.jsx';
 import StoryViewer from '../components/StoryViewer.jsx';
 import { useMessageNotifications } from '../hooks/useMessageNotifications.js';
 import { usePostNotifications } from '../hooks/usePostNotifications.js';
-import { listenToFriendsStories, getUserStories } from '../services/storyService.js';
+import { listenToFriendsStories, listenToUserStories } from '../services/storyService.js';
+import { PageLoading, SkeletonLoader } from '../components/Loading.jsx';
 
 export default function Home() {
   const { user, profile } = useAuth();
@@ -55,28 +56,38 @@ export default function Home() {
     if (!user || !profile) return;
 
     const friendIds = profile.friends || [];
-    let unsubscribe = null;
+    let myStoriesList = [];
+    let friendsStoriesList = [];
     
-    // Get my stories and set up listener
-    getUserStories(user.uid).then((myStories) => {
-      // Listen to friends' stories
-      unsubscribe = listenToFriendsStories(friendIds, (storiesGroups) => {
-        const allGroups = [
-          ...(myStories.length > 0 ? [{ userId: user.uid, stories: myStories }] : []),
-          ...storiesGroups
-        ];
-        setAllStoriesGroups(allGroups);
-      });
+    // Listen to my stories (real-time)
+    const unsubscribeMyStories = listenToUserStories(user.uid, (stories) => {
+      console.log('📸 Home: My stories updated:', stories.length);
+      myStoriesList = stories;
+      
+      // Update all stories groups
+      const allGroups = [
+        ...(stories.length > 0 ? [{ userId: user.uid, stories }] : []),
+        ...friendsStoriesList
+      ];
+      setAllStoriesGroups(allGroups);
+    });
 
-      // Initial set with my stories
-      const initialGroups = myStories.length > 0 
-        ? [{ userId: user.uid, stories: myStories }]
-        : [];
-      setAllStoriesGroups(initialGroups);
+    // Listen to friends' stories
+    const unsubscribeFriends = listenToFriendsStories(friendIds, (storiesGroups) => {
+      console.log('👥 Home: Friends stories updated:', storiesGroups.length);
+      friendsStoriesList = storiesGroups;
+      
+      // Combine with my stories
+      const allGroups = [
+        ...(myStoriesList.length > 0 ? [{ userId: user.uid, stories: myStoriesList }] : []),
+        ...storiesGroups
+      ];
+      setAllStoriesGroups(allGroups);
     });
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      unsubscribeMyStories();
+      unsubscribeFriends();
     };
   }, [user, profile]);
 
@@ -93,6 +104,21 @@ export default function Home() {
     setCurrentStoryGroupIndex(index >= 0 ? index : 0);
     setViewingStory({ userId, stories });
     setShowStoryViewer(true);
+  };
+
+  const handleStoryDeleted = (updatedStories) => {
+    if (!updatedStories || updatedStories.length === 0) {
+      // No more stories, close viewer
+      setShowStoryViewer(false);
+      setViewingStory(null);
+    } else {
+      // Update current viewing story
+      setViewingStory(prev => ({
+        ...prev,
+        stories: updatedStories
+      }));
+    }
+    // Refresh stories list will happen automatically via listener
   };
 
   const handleNextStoryGroup = () => {
@@ -117,9 +143,10 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-[#F6F5FB]">
-        <div className="text-slate-400">Đang tải...</div>
-      </div>
+      <>
+        <Navigation />
+        <PageLoading text="Đang tải bài viết..." />
+      </>
     );
   }
 
@@ -175,6 +202,7 @@ export default function Home() {
           stories={viewingStory.stories}
           onNextUser={handleNextStoryGroup}
           onPrevUser={handlePrevStoryGroup}
+          onStoryDeleted={handleStoryDeleted}
         />
       )}
     </div>

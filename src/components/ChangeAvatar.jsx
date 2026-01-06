@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { uploadAvatar } from '../services/storageService.js';
 import { getInitials } from '../utils/helpers.js';
+import { LoadingSpinner } from './Loading.jsx';
 
 /**
  * Component for changing user avatar
@@ -72,7 +73,7 @@ export default function ChangeAvatar() {
         )}
         {uploading && (
           <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
-            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            <LoadingSpinner size="sm" className="text-white" />
           </div>
         )}
       </button>
