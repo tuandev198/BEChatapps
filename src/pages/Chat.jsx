@@ -72,20 +72,37 @@ export default function Chat() {
 
       {/* ================= KHU VỰC CHAT ================= */}
       <main className="flex-1 flex flex-col md:transition-all md:duration-300">
-        {/* TOP BAR - Hiển thị trên cả mobile và desktop khi sidebar đóng */}
-        <div className={`h-14 flex items-center px-4 border-b border-slate-200 bg-white ${
-          sidebarOpen ? 'md:hidden' : ''
-        }`}>
-          <button
-            onClick={() => {
-              setMenuOpen(true);
-              setSidebarOpen(true);
-            }}
-            className="mr-3 text-xl text-indigo-600"
-            title="Mở menu"
-          >
-            ☰
-          </button>
+        {/* TOP BAR - Hiển thị trên mobile + khi sidebar đóng */}
+        <div
+          className={`h-14 flex items-center px-4 border-b border-slate-200 bg-white ${
+            sidebarOpen ? 'md:hidden' : ''
+          }`}
+        >
+          {/* Nếu đang trong cuộc trò chuyện -> nút Back, ngược lại là menu */}
+          {selectedChatId ? (
+            <button
+              onClick={() => {
+                setSelectedChatId(null);
+                setSelectedOtherUser(null);
+                setSidebarOpen(true); // mở lại danh sách chat
+              }}
+              className="mr-3 text-xl text-indigo-600"
+              title="Quay lại danh sách trò chuyện"
+            >
+              ←
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setMenuOpen(true);
+                setSidebarOpen(true);
+              }}
+              className="mr-3 text-xl text-indigo-600"
+              title="Mở menu"
+            >
+              ☰
+            </button>
+          )}
 
           <span className="font-medium text-slate-800 truncate">
             {selectedOtherUser?.displayName || 'Tin nhắn'}
