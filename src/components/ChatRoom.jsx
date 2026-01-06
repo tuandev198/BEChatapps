@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { listenToMessages, sendMessage } from '../services/chatService.js';
 import { uploadChatImage } from '../services/storageService.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -10,6 +11,7 @@ import EmojiPickerButton from './EmojiPickerButton.jsx';
 
 export default function ChatRoom({ chatId, otherUser }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
@@ -158,21 +160,26 @@ export default function ChatRoom({ chatId, otherUser }) {
       {/* Header */}
       <div className="px-4 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 flex-shrink-0">
         <div className="flex items-center gap-3">
-          {otherUser?.photoURL ? (
-            <img src={otherUser.photoURL} className="w-10 h-10 rounded-full" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center text-white font-semibold">
-              {otherUser?.displayName?.[0]?.toUpperCase() || 'U'}
+          <button
+            onClick={() => navigate(`/user/${otherUser?.uid || chatId.split('_').find(id => id !== user.uid)}`)}
+            className="flex items-center gap-3 flex-1 hover:opacity-80 transition-opacity"
+          >
+            {otherUser?.photoURL ? (
+              <img src={otherUser.photoURL} className="w-10 h-10 rounded-full" alt={otherUser.displayName} />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-white/30 flex items-center justify-center text-white font-semibold">
+                {otherUser?.displayName?.[0]?.toUpperCase() || 'U'}
+              </div>
+            )}
+            <div className="flex-1 min-w-0 leading-tight text-left">
+              <div className="text-sm font-semibold text-white truncate">
+                {otherUser?.displayName || otherUser?.email}
+              </div>
+              <div className="text-xs text-white/70 mt-0.5 truncate">
+                {otherUser?.email}
+              </div>
             </div>
-          )}
-          <div className="flex-1 min-w-0 leading-tight">
-            <div className="text-sm font-semibold text-white truncate">
-              {otherUser?.displayName || otherUser?.email}
-            </div>
-            <div className="text-xs text-white/70 mt-0.5 truncate">
-              {otherUser?.email}
-            </div>
-          </div>
+          </button>
           <button className="p-2 text-white text-xl">⋮</button>
         </div>
       </div>

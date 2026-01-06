@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getUserById } from '../services/friendService.js';
 import { likePost, addComment, deletePost } from '../services/postService.js';
@@ -90,7 +91,10 @@ export default function Post({ post, onDelete }) {
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-4">
       {/* Header */}
       <div className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-3">
+        <Link
+          to={post.userId === user.uid ? '/profile' : `/user/${post.userId}`}
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+        >
           {postUser?.photoURL ? (
             <img
               src={postUser.photoURL}
@@ -112,7 +116,7 @@ export default function Post({ post, onDelete }) {
               </div>
             )}
           </div>
-        </div>
+        </Link>
 
         {post.userId === user.uid && (
           <button
@@ -141,9 +145,12 @@ export default function Post({ post, onDelete }) {
       {/* Caption */}
       {post.caption && (
         <div className="px-4 py-2">
-          <span className="font-semibold text-slate-800 mr-2">
+          <Link
+            to={post.userId === user.uid ? '/profile' : `/user/${post.userId}`}
+            className="font-semibold text-slate-800 mr-2 hover:underline"
+          >
             {postUser?.displayName || 'Người dùng'}
-          </span>
+          </Link>
           <span className="text-slate-700">{post.caption}</span>
         </div>
       )}
@@ -181,9 +188,12 @@ export default function Post({ post, onDelete }) {
               const commentUser = commentUsers[comment.userId];
               return (
                 <div key={comment.id} className="flex gap-2">
-                  <span className="font-semibold text-slate-800">
+                  <Link
+                    to={comment.userId === user.uid ? '/profile' : `/user/${comment.userId}`}
+                    className="font-semibold text-slate-800 hover:underline"
+                  >
                     {commentUser?.displayName || 'Người dùng'}:
-                  </span>
+                  </Link>
                   <span className="text-slate-700">{comment.text}</span>
                 </div>
               );

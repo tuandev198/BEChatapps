@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase.js';
 import { getUserById } from '../services/friendService.js';
 import { getChatId } from '../services/chatService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getInitials } from '../utils/helpers.js';
-import { Search } from 'lucide-react';
+import { Search, User } from 'lucide-react';
 
 /**
  * FriendList (HOÀN CHỈNH)
@@ -16,6 +17,7 @@ import { Search } from 'lucide-react';
  */
 export default function FriendList({ onSelectFriend }) {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
 
   const [friends, setFriends] = useState([]);           // [uid]
   const [friendUsers, setFriendUsers] = useState({});   // { uid: userData }
@@ -94,55 +96,78 @@ export default function FriendList({ onSelectFriend }) {
             onSelectFriend(chatId, friend);
           };
 
+          const handleViewProfile = (e) => {
+            e.stopPropagation();
+            navigate(`/user/${friendUid}`);
+          };
+
           return (
-            <button
-  key={friendUid}
-  onClick={handleClick}
-  className={`group w-full flex items-center gap-3 p-3 mb-2 rounded-2xl transition text-left
-    ${unread > 0
-      ? 'bg-[rgb(79_70_229/var(--tw-bg-opacity))] ring-1 ring-[rgb(79_70_229/var(--tw-bg-opacity))] text-white'
-      : 'bg-[rgb(79_70_229/0.08)] hover:bg-[rgb(79_70_229/0.15)]'}
-  `}
->
-
-              {/* Avatar */}
-              {friend.photoURL ? (
-                <img
-                  src={friend.photoURL}
-                  alt={friend.displayName}
-                  className="w-11 h-11 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[rgb(79_70_229)] to-[rgb(99_102_241)] flex items-center justify-center text-white font-semibold">
-                  {getInitials(friend.displayName || friend.email || 'F')}
-                </div>
-              )}
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm truncate ${unread > 0 ? 'font-semibold text-slate-100' : 'text-indigo-600'}`}>
-                    {friend.displayName || 'Người dùng'}
-                  </span>
-
-                  {/* Unread badge */}
-                  {unread > 0 && (
-                    <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[rgb(79_70_229)] text-white text-[10px] font-semibold flex items-center justify-center">
-                      {unread > 9 ? '9+' : unread}
-                    </span>
+            <div
+              key={friendUid}
+              className={`group w-full flex items-center gap-3 p-3 mb-2 rounded-2xl transition
+                ${unread > 0
+                  ? 'bg-[rgb(79_70_229/var(--tw-bg-opacity))] ring-1 ring-[rgb(79_70_229/var(--tw-bg-opacity))] text-white'
+                  : 'bg-[rgb(79_70_229/0.08)] hover:bg-[rgb(79_70_229/0.15)]'}
+              `}
+            >
+              <button
+                onClick={handleClick}
+                className="flex items-center gap-3 flex-1 text-left"
+              >
+                {/* Avatar - clickable to view profile */}
+                <button
+                  onClick={handleViewProfile}
+                  className="hover:opacity-80 transition-opacity"
+                  title="Xem trang cá nhân"
+                >
+                  {friend.photoURL ? (
+                    <img
+                      src={friend.photoURL}
+                      alt={friend.displayName}
+                      className="w-11 h-11 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[rgb(79_70_229)] to-[rgb(99_102_241)] flex items-center justify-center text-white font-semibold">
+                      {getInitials(friend.displayName || friend.email || 'F')}
+                    </div>
                   )}
+                </button>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-sm truncate ${unread > 0 ? 'font-semibold text-slate-100' : 'text-indigo-600'}`}>
+                      {friend.displayName || 'Người dùng'}
+                    </span>
+
+                    {/* Unread badge */}
+                    {unread > 0 && (
+                      <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[rgb(79_70_229)] text-white text-[10px] font-semibold flex items-center justify-center">
+                        {unread > 9 ? '9+' : unread}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-xs text-slate-400 truncate">
+                    {friend.email}
+                  </div>
                 </div>
 
-                <div className="text-xs text-slate-400 truncate">
-                  {friend.email}
+                {/* CTA */}
+                <div className="text-xs text-[rgb(79_70_229)] opacity-0 group-hover:opacity-100 transition">
+                  Chat →
                 </div>
-              </div>
+              </button>
 
-              {/* CTA */}
-              <div className="text-xs text-[rgb(79_70_229)] opacity-0 group-hover:opacity-100 transition">
-                Chat →
-              </div>
-            </button>
+              {/* View Profile Button */}
+              <button
+                onClick={handleViewProfile}
+                className="p-2 text-slate-400 hover:text-indigo-600 transition-colors opacity-0 group-hover:opacity-100"
+                title="Xem trang cá nhân"
+              >
+                <User className="w-4 h-4" />
+              </button>
+            </div>
           );
         })}
       </div>

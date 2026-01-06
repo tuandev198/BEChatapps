@@ -9,6 +9,7 @@ import Friends from './pages/Friends.jsx';
 import FriendRequestsPage from './pages/FriendRequests.jsx';
 import Search from './pages/Search.jsx';
 import Settings from './pages/Settings.jsx';
+import UserProfile from './pages/UserProfile.jsx';
 import { PageLoading } from './components/Loading.jsx';
 
 // Wrapper để bảo vệ route cần đăng nhập
@@ -53,6 +54,14 @@ export default function App() {
           element={
             <PrivateRoute>
               <Profile />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/user/:userId"
+          element={
+            <PrivateRoute>
+              <UserProfile />
             </PrivateRoute>
           }
         />
