@@ -144,3 +144,6 @@ deleteExpiredStories();
 - Kiểm tra progress bar có chạy không
 - Thử click để chuyển thủ công
 
+
+
+

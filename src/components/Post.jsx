@@ -3,224 +3,240 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { getUserById } from '../services/friendService.js';
 import { likePost, addComment, deletePost } from '../services/postService.js';
-import { formatTimestamp } from '../utils/helpers.js';
-import { getInitials } from '../utils/helpers.js';
+import { formatTimestamp, getInitials } from '../utils/helpers.js';
 
 export default function Post({ post, onDelete }) {
   const { user } = useAuth();
-  const [postUser, setPostUser] = useState(null);
-  const [commentText, setCommentText] = useState('');
-  const [addingComment, setAddingComment] = useState(false);
-  const [liking, setLiking] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [showComments, setShowComments] = useState(false);
-  const [commentUsers, setCommentUsers] = useState({});
 
-  const isLiked = post.likes?.includes(user.uid) || false;
+  const [postUser, setPostUser] = useState(null);
+  const [commentUsers, setCommentUsers] = useState({});
+  const [commentText, setCommentText] = useState('');
+  const [showComments, setShowComments] = useState(false);
+
+  const [liking, setLiking] = useState(false);
+  const [addingComment, setAddingComment] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [showImage, setShowImage] = useState(false);
+
+  // Swipe modal
+  const [startY, setStartY] = useState(0);
+  const [currentY, setCurrentY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+
+  const isLiked = post.likes?.includes(user.uid);
   const likesCount = post.likes?.length || 0;
   const comments = post.comments || [];
 
-  // Fetch post author
+  // Lock body scroll
   useEffect(() => {
-    if (post.userId && !postUser) {
-      getUserById(post.userId).then(setPostUser);
-    }
+    document.body.style.overflow = showImage ? 'hidden' : '';
+  }, [showImage]);
+
+  // Fetch author
+  useEffect(() => {
+    if (post.userId) getUserById(post.userId).then(setPostUser);
   }, [post.userId]);
 
-  // Fetch comment authors
+  // Fetch comment users
   useEffect(() => {
-    if (comments.length > 0) {
-      const userIds = comments.map(c => c.userId).filter(id => !commentUsers[id]);
-      if (userIds.length > 0) {
-        Promise.all(
-          userIds.map(userId =>
-            getUserById(userId).then(user => {
-              if (user) {
-                setCommentUsers(prev => ({ ...prev, [userId]: user }));
-              }
-            })
-          )
-        );
+    comments.forEach(c => {
+      if (!commentUsers[c.userId]) {
+        getUserById(c.userId).then(u => {
+          if (u) {
+            setCommentUsers(prev => ({ ...prev, [c.userId]: u }));
+          }
+        });
       }
-    }
+    });
   }, [comments]);
 
   const handleLike = async () => {
     if (liking) return;
     setLiking(true);
-    try {
-      await likePost(post.id, user.uid);
-    } catch (err) {
-      console.error('Failed to like post:', err);
-    } finally {
-      setLiking(false);
-    }
+    await likePost(post.id, user.uid);
+    setLiking(false);
   };
 
-  const handleComment = async (e) => {
+  const handleComment = async e => {
     e.preventDefault();
-    if (!commentText.trim() || addingComment) return;
-
+    if (!commentText.trim()) return;
     setAddingComment(true);
-    try {
-      await addComment(post.id, user.uid, commentText.trim());
-      setCommentText('');
-      setShowComments(true);
-    } catch (err) {
-      console.error('Failed to add comment:', err);
-    } finally {
-      setAddingComment(false);
-    }
+    await addComment(post.id, user.uid, commentText.trim());
+    setCommentText('');
+    setShowComments(true);
+    setAddingComment(false);
   };
 
   const handleDelete = async () => {
-    if (!confirm('Bạn có chắc muốn xóa bài viết này?')) return;
-
+    if (!confirm('Xóa bài viết?')) return;
     setDeleting(true);
-    try {
-      await deletePost(post.id, user.uid);
-      if (onDelete) onDelete(post.id);
-    } catch (err) {
-      alert(err.message || 'Không thể xóa bài viết');
-    } finally {
-      setDeleting(false);
-    }
+    await deletePost(post.id, user.uid);
+    onDelete?.(post.id);
+    setDeleting(false);
+  };
+
+  // Swipe handlers
+  const handleTouchStart = e => {
+    setStartY(e.touches[0].clientY);
+    setDragging(true);
+  };
+
+  const handleTouchMove = e => {
+    if (dragging) setCurrentY(e.touches[0].clientY);
+  };
+
+  const handleTouchEnd = () => {
+    if (currentY - startY > 120) setShowImage(false);
+    setDragging(false);
+    setStartY(0);
+    setCurrentY(0);
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 mb-4">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4">
-        <Link
-          to={post.userId === user.uid ? '/profile' : `/user/${post.userId}`}
-          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-        >
-          {postUser?.photoURL ? (
-            <img
-              src={postUser.photoURL}
-              alt={postUser.displayName || 'User'}
-              className="w-10 h-10 rounded-full object-cover"
-            />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-              {getInitials(postUser?.displayName || postUser?.email || 'U')}
-            </div>
-          )}
-          <div>
-            <div className="font-semibold text-slate-800">
-              {postUser?.displayName || postUser?.email || 'Người dùng'}
-            </div>
-            {post.createdAt && (
-              <div className="text-xs text-slate-400">
-                {formatTimestamp(post.createdAt)}
-              </div>
-            )}
-          </div>
-        </Link>
-
-        {post.userId === user.uid && (
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="text-red-500 hover:text-red-700 p-2"
-            title="Xóa bài viết"
-          >
-            {deleting ? '...' : '🗑️'}
-          </button>
-        )}
-      </div>
-
-      {/* Image */}
-      {post.imageURL && (
-        <div className="w-full">
-          <img
-            src={post.imageURL}
-            alt="Post"
-            className="w-full object-contain bg-slate-100"
-            style={{ maxHeight: '600px' }}
-          />
-        </div>
-      )}
-
-      {/* Caption */}
-      {post.caption && (
-        <div className="px-4 py-2">
+    <>
+      {/* POST CARD */}
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 mb-6 overflow-hidden">
+        {/* HEADER */}
+        <div className="flex items-center justify-between px-4 py-3">
           <Link
             to={post.userId === user.uid ? '/profile' : `/user/${post.userId}`}
-            className="font-semibold text-slate-800 mr-2 hover:underline"
+            className="flex items-center gap-3"
           >
-            {postUser?.displayName || 'Người dùng'}
+            {postUser?.photoURL ? (
+              <img
+                src={postUser.photoURL}
+                className="w-10 h-10 rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-indigo-500 text-white flex items-center justify-center font-semibold">
+                {getInitials(postUser?.displayName || 'U')}
+              </div>
+            )}
+
+            <div className="leading-tight">
+              <p className="font-semibold text-sm text-slate-900">
+                {postUser?.displayName || postUser?.email}
+              </p>
+              <p className="text-xs text-slate-400">
+                {formatTimestamp(post.createdAt)}
+              </p>
+            </div>
           </Link>
-          <span className="text-slate-700">{post.caption}</span>
-        </div>
-      )}
 
-      {/* Actions */}
-      <div className="px-4 py-2 border-t border-slate-100">
-        <div className="flex items-center gap-4 mb-2">
-          <button
-            onClick={handleLike}
-            disabled={liking}
-            className={`text-2xl transition-transform hover:scale-110 ${
-              isLiked ? 'text-red-500' : 'text-slate-400'
-            }`}
-          >
-            {isLiked ? '❤️' : '🤍'}
-          </button>
-          <button
-            onClick={() => setShowComments(!showComments)}
-            className="text-2xl text-slate-400 hover:text-slate-600"
-          >
-            💬
-          </button>
+          {post.userId === user.uid && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="text-slate-400 hover:text-red-500 text-xl"
+            >
+              ⋯
+            </button>
+          )}
         </div>
 
-        {likesCount > 0 && (
-          <div className="text-sm font-semibold text-slate-800 mb-2">
-            {likesCount} {likesCount === 1 ? 'lượt thích' : 'lượt thích'}
+        {/* IMAGE */}
+        {post.imageURL && (
+          <div className="relative bg-black">
+            {!imageLoaded && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-white/40 border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+
+            <img
+              src={post.imageURL}
+              loading="lazy"
+              onLoad={() => setImageLoaded(true)}
+              onClick={() => setShowImage(true)}
+              className={`w-full aspect-[4/5] object-cover cursor-zoom-in transition-opacity ${
+                imageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+            />
           </div>
         )}
 
-        {/* Comments */}
+        {/* ACTIONS */}
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-5 text-[22px] mb-2">
+            <button onClick={handleLike}>
+              {isLiked ? '❤️' : '🤍'}
+            </button>
+            <button onClick={() => setShowComments(!showComments)}>💬</button>
+            <button className="ml-auto">📤</button>
+          </div>
+
+          {likesCount > 0 && (
+            <p className="text-sm font-semibold text-slate-900">
+              {likesCount} lượt thích
+            </p>
+          )}
+        </div>
+
+        {/* CAPTION */}
+        {post.caption && (
+          <div className="px-4 pb-2 text-sm text-slate-800">
+            <span className="font-semibold mr-1">
+              {postUser?.displayName}
+            </span>
+            {post.caption}
+          </div>
+        )}
+
+        {/* COMMENTS */}
         {showComments && (
-          <div className="space-y-2 mb-2">
-            {comments.map((comment) => {
-              const commentUser = commentUsers[comment.userId];
-              return (
-                <div key={comment.id} className="flex gap-2">
-                  <Link
-                    to={comment.userId === user.uid ? '/profile' : `/user/${comment.userId}`}
-                    className="font-semibold text-slate-800 hover:underline"
-                  >
-                    {commentUser?.displayName || 'Người dùng'}:
-                  </Link>
-                  <span className="text-slate-700">{comment.text}</span>
-                </div>
-              );
-            })}
+          <div className="px-4 pb-2 space-y-1 text-sm">
+            {comments.map(c => (
+              <div key={c.id}>
+                <span className="font-semibold mr-1">
+                  {commentUsers[c.userId]?.displayName || 'User'}
+                </span>
+                {c.text}
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Comment input */}
-        <form onSubmit={handleComment} className="flex gap-2">
+        {/* COMMENT INPUT */}
+        <form
+          onSubmit={handleComment}
+          className="px-4 py-3 border-t flex items-center gap-2"
+        >
           <input
-            type="text"
             value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
+            onChange={e => setCommentText(e.target.value)}
             placeholder="Thêm bình luận..."
-            className="flex-1 px-3 py-2 rounded-full bg-slate-100 border border-slate-200 outline-none focus:border-indigo-500 text-sm"
-            disabled={addingComment}
+            className="flex-1 text-sm outline-none"
           />
-          <button
-            type="submit"
-            disabled={!commentText.trim() || addingComment}
-            className="px-4 py-2 text-indigo-600 font-medium hover:text-indigo-700 disabled:opacity-50"
-          >
+          <button className="text-indigo-600 font-semibold text-sm">
             {addingComment ? '...' : 'Đăng'}
           </button>
         </form>
       </div>
-    </div>
+
+      {/* IMAGE MODAL */}
+      {showImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+          onClick={() => setShowImage(false)}
+        >
+          <img
+            src={post.imageURL}
+            onClick={e => e.stopPropagation()}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            style={{
+              transform: dragging
+                ? `translateY(${Math.max(0, currentY - startY)}px)`
+                : 'translateY(0)',
+              transition: dragging ? 'none' : 'transform 0.25s ease'
+            }}
+            className="max-w-[95vw] max-h-[95vh] object-contain"
+          />
+        </div>
+      )}
+    </>
   );
 }
-
