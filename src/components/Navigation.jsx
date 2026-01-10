@@ -13,6 +13,7 @@ import {
   User,
   Bell,
   Mail,
+  Smile,
   Settings,
   LogOut,
   Menu
@@ -141,7 +142,7 @@ export default function Navigation() {
         className="md:hidden fixed top-4 right-4 w-10 h-10 bg-white rounded-full shadow-lg
           flex items-center justify-center z-40"
       >
-        <Menu className="w-5 h-5" />
+        <Smile className="w-5 h-5" />
       </button>
 
       {/* MOBILE MENU */}

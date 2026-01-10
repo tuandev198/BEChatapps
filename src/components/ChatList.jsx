@@ -2,79 +2,86 @@ import { useEffect, useState, useRef } from 'react';
 import { listenToChats, deleteChat } from '../services/chatService.js';
 import { getUserById } from '../services/friendService.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import { formatTimestamp } from '../utils/helpers.js';
-import { getInitials } from '../utils/helpers.js';
-import { Loading, SkeletonLoader } from './Loading.jsx';
+import { formatTimestamp, getInitials } from '../utils/helpers.js';
+import { SkeletonLoader } from './Loading.jsx';
+
+const MIN_LOADING_TIME = 1200; // ⭐ loading tối thiểu 1.2s
 
 /**
- * Chat list component showing all user's chats
+ * Chat list component
  */
 export default function ChatList({ onSelectChat, selectedChatId }) {
   const { user } = useAuth();
 
-  // ⭐ null = chưa load, [] = đã load nhưng rỗng
+  // null = chưa load, [] = đã load nhưng rỗng
   const [chats, setChats] = useState(null);
   const [chatUsers, setChatUsers] = useState({});
-  const [deletingChatId, setDeletingChatId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [deletingChatId, setDeletingChatId] = useState(null);
+
+  // cache user đã fetch → tránh gọi API lại
+  const usersCacheRef = useRef({});
 
   useEffect(() => {
     if (!user) {
       setChats([]);
+      setLoading(false);
       return;
     }
 
-    console.log('🔍 ChatList: Starting listener for user:', user.uid);
     let isMounted = true;
+    const startTime = Date.now();
 
-    // Set loading state
     setLoading(true);
     setChats([]);
 
     const unsubscribe = listenToChats(user.uid, async (chatsList) => {
-      console.log('📦 ChatList: Received chats list:', chatsList?.length || 0, chatsList);
-      
-      if (!isMounted) {
-        console.log('⚠️ ChatList: Component unmounted, ignoring update');
-        return;
-      }
+      if (!isMounted) return;
 
       try {
-        // Always set chats, even if empty - this prevents stuck loading state
-        const safeChatsList = Array.isArray(chatsList) ? chatsList : [];
-        setChats(safeChatsList);
-        setLoading(false);
-        console.log('✅ ChatList: Set chats state:', safeChatsList.length);
+        const safeChats = Array.isArray(chatsList) ? chatsList : [];
 
-        // Fetch user data only for new chats
-        const usersMap = {};
+        /** 🕒 đảm bảo loading tối thiểu */
+        const finishLoading = () => {
+          if (!isMounted) return;
+          setChats(safeChats);
+          setLoading(false);
+        };
+
+        const elapsed = Date.now() - startTime;
+        const remaining = MIN_LOADING_TIME - elapsed;
+
+        if (remaining > 0) {
+          setTimeout(finishLoading, remaining);
+        } else {
+          finishLoading();
+        }
+
+        /** 👤 fetch user info song song */
+        const usersMap = { ...usersCacheRef.current };
+
         await Promise.all(
-          safeChatsList.map(async (chat) => {
-            console.log('🔍 ChatList: Processing chat:', chat.id, 'otherUid:', chat.otherUid);
-            if (chat.otherUid && !usersMap[chat.otherUid]) {
-              try {
-                const otherUser = await getUserById(chat.otherUid);
-                if (otherUser) {
-                  usersMap[chat.otherUid] = otherUser;
-                  console.log('✅ ChatList: Fetched user:', chat.otherUid, otherUser.displayName);
-                } else {
-                  console.warn('⚠️ ChatList: User not found:', chat.otherUid);
-                }
-              } catch (err) {
-                console.error('❌ ChatList: Failed to fetch user:', chat.otherUid, err);
+          safeChats.map(async (chat) => {
+            if (!chat.otherUid || usersMap[chat.otherUid]) return;
+
+            try {
+              const userData = await getUserById(chat.otherUid);
+              if (userData) {
+                usersMap[chat.otherUid] = userData;
               }
+            } catch (err) {
+              console.error('Fetch user failed:', chat.otherUid, err);
             }
           })
         );
 
         if (isMounted) {
+          usersCacheRef.current = usersMap;
           setChatUsers(usersMap);
-          console.log('✅ ChatList: Set chatUsers:', Object.keys(usersMap).length);
         }
-        } catch (error) {
-        console.error('❌ ChatList: Error processing chats:', error);
+      } catch (err) {
+        console.error('ChatList error:', err);
         if (isMounted) {
-          // Set to empty array on error to prevent stuck loading
           setChats([]);
           setLoading(false);
         }
@@ -82,39 +89,16 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     });
 
     return () => {
-      console.log('🧹 ChatList: Cleaning up listener');
       isMounted = false;
       unsubscribe();
     };
   }, [user]);
 
-
-  // Loading state
-  if (loading || chats === null) {
-    return (
-      <div className="p-4 space-y-3">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="bg-white rounded-2xl p-3">
-            <SkeletonLoader lines={2} />
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // 📭 Không có chat
-  if (chats.length === 0) {
-    return (
-      <div className="p-4 text-center text-slate-400 text-sm">
-        Chưa có cuộc trò chuyện nào
-      </div>
-    );
-  }
-
+  /** 🗑️ Xoá chat */
   const handleDeleteChat = async (chatId, e) => {
     e.stopPropagation();
     if (!confirm('Bạn có chắc muốn xóa cuộc trò chuyện này?')) return;
-    
+
     setDeletingChatId(chatId);
     try {
       await deleteChat(chatId, user.uid);
@@ -125,77 +109,97 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     }
   };
 
-  // ✅ Có chat
+  /** ⏳ Loading */
+  if (loading || chats === null) {
+    return (
+      <div className="p-4 space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-white rounded-2xl p-3">
+            <SkeletonLoader lines={2} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  /** 📭 Không có chat */
+  if (chats.length === 0) {
+    return (
+      <div className="p-4 text-center text-slate-400 text-sm">
+        Chưa có cuộc trò chuyện nào
+      </div>
+    );
+  }
+
+  /** ✅ Có chat */
   return (
     <div className="flex-1 overflow-y-auto bg-[#F6F5FB] px-3 py-4">
       {chats
-        .filter(chat => !chat.deletedBy?.includes(user.uid)) // Filter deleted chats
+        .filter((chat) => !chat.deletedBy?.includes(user.uid))
         .map((chat) => {
-        const otherUser = chatUsers[chat.otherUid];
+          const otherUser = chatUsers[chat.otherUid];
 
-        return (
-          <div
-            key={chat.id}
-            className={`w-full mb-3 rounded-2xl transition relative group
-              ${
-                selectedChatId === chat.id
-                  ? 'bg-white shadow ring-2 ring-indigo-400'
-                  : 'bg-white hover:shadow-md'
-              }`}
-          >
-            <button
-              onClick={() => onSelectChat(chat.id, otherUser)}
-              className="w-full p-3 text-left"
+          return (
+            <div
+              key={chat.id}
+              className={`relative mb-3 rounded-2xl transition group
+                ${
+                  selectedChatId === chat.id
+                    ? 'bg-white shadow ring-2 ring-indigo-400'
+                    : 'bg-white hover:shadow-md'
+                }`}
             >
-            <div className="flex items-center gap-3">
-              {otherUser?.photoURL ? (
-                <img
-                  src={otherUser.photoURL}
-                  alt={otherUser.displayName || 'User'}
-                  className="w-12 h-12 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                  {getInitials(
-                    otherUser?.displayName || otherUser?.email || 'U'
+              <button
+                onClick={() => onSelectChat(chat.id, otherUser)}
+                className="w-full p-3 text-left"
+              >
+                <div className="flex items-center gap-3">
+                  {otherUser?.photoURL ? (
+                    <img
+                      src={otherUser.photoURL}
+                      alt={otherUser.displayName}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
+                      {getInitials(
+                        otherUser?.displayName || otherUser?.email || 'U'
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
 
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-slate-800 truncate">
-                  {otherUser?.displayName || otherUser?.email || 'Người dùng'}
-                </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-slate-800 truncate">
+                      {otherUser?.displayName ||
+                        otherUser?.email ||
+                        'Người dùng'}
+                    </div>
 
-                <div className="text-xs text-slate-400 truncate">
-                  {chat.lastMessage || 'Chưa có tin nhắn'}
-                </div>
+                    <div className="text-xs text-slate-400 truncate">
+                      {chat.lastMessage || 'Chưa có tin nhắn'}
+                    </div>
 
-                {chat.updatedAt && (
-                  <div className="text-[11px] text-slate-400 mt-1">
-                    {formatTimestamp(chat.updatedAt)}
+                    {chat.updatedAt && (
+                      <div className="text-[11px] text-slate-400 mt-1">
+                        {formatTimestamp(chat.updatedAt)}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              </button>
+
+              {/* 🗑️ Delete */}
+              <button
+                onClick={(e) => handleDeleteChat(chat.id, e)}
+                disabled={deletingChatId === chat.id}
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50"
+                title="Xóa cuộc trò chuyện"
+              >
+                {deletingChatId === chat.id ? '...' : '🗑️'}
+              </button>
             </div>
-            </button>
-            
-            {/* Delete button */}
-            <button
-              onClick={(e) => handleDeleteChat(chat.id, e)}
-              disabled={deletingChatId === chat.id}
-              className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50"
-              title="Xóa cuộc trò chuyện"
-            >
-              {deletingChatId === chat.id ? (
-                <span className="text-xs">...</span>
-              ) : (
-                '🗑️'
-              )}
-            </button>
-          </div>
-        );
-      })}
+          );
+        })}
     </div>
   );
 }
