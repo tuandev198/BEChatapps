@@ -1,11 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
+import { Trash2 } from 'lucide-react';
 import { listenToChats, deleteChat } from '../services/chatService.js';
 import { getUserById } from '../services/friendService.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatTimestamp, getInitials } from '../utils/helpers.js';
 import { SkeletonLoader } from './Loading.jsx';
 
-const MIN_LOADING_TIME = 1200; // ⭐ loading tối thiểu 1.2s
+const MIN_LOADING_TIME = 1200; // loading tối thiểu 1.2s
+const SWIPE_OPEN_DISTANCE = 50; // px
+const SWIPE_WIDTH = 80; // px (độ rộng nút xoá)
 
 /**
  * Chat list component
@@ -13,13 +16,17 @@ const MIN_LOADING_TIME = 1200; // ⭐ loading tối thiểu 1.2s
 export default function ChatList({ onSelectChat, selectedChatId }) {
   const { user } = useAuth();
 
-  // null = chưa load, [] = đã load nhưng rỗng
   const [chats, setChats] = useState(null);
   const [chatUsers, setChatUsers] = useState({});
   const [loading, setLoading] = useState(true);
   const [deletingChatId, setDeletingChatId] = useState(null);
 
-  // cache user đã fetch → tránh gọi API lại
+  // swipe state
+  const [openChatId, setOpenChatId] = useState(null);
+  const startXRef = useRef(0);
+  const deltaXRef = useRef(0);
+
+  // cache user
   const usersCacheRef = useRef({});
 
   useEffect(() => {
@@ -41,7 +48,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
       try {
         const safeChats = Array.isArray(chatsList) ? chatsList : [];
 
-        /** 🕒 đảm bảo loading tối thiểu */
+        /** ⏳ đảm bảo loading tối thiểu */
         const finishLoading = () => {
           if (!isMounted) return;
           setChats(safeChats);
@@ -57,18 +64,15 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
           finishLoading();
         }
 
-        /** 👤 fetch user info song song */
+        /** 👤 fetch user info (có cache) */
         const usersMap = { ...usersCacheRef.current };
 
         await Promise.all(
           safeChats.map(async (chat) => {
             if (!chat.otherUid || usersMap[chat.otherUid]) return;
-
             try {
               const userData = await getUserById(chat.otherUid);
-              if (userData) {
-                usersMap[chat.otherUid] = userData;
-              }
+              if (userData) usersMap[chat.otherUid] = userData;
             } catch (err) {
               console.error('Fetch user failed:', chat.otherUid, err);
             }
@@ -102,6 +106,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     setDeletingChatId(chatId);
     try {
       await deleteChat(chatId, user.uid);
+      setOpenChatId(null);
     } catch (err) {
       alert(err.message || 'Không thể xóa cuộc trò chuyện');
     } finally {
@@ -138,65 +143,109 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
         .filter((chat) => !chat.deletedBy?.includes(user.uid))
         .map((chat) => {
           const otherUser = chatUsers[chat.otherUid];
+          const isOpen = openChatId === chat.id;
+
+          const handlePointerDown = (e) => {
+            startXRef.current = e.clientX;
+            deltaXRef.current = 0;
+          };
+
+          const handlePointerMove = (e) => {
+            if (!startXRef.current) return;
+            deltaXRef.current = e.clientX - startXRef.current;
+          };
+
+          const handlePointerUp = () => {
+            if (deltaXRef.current < -SWIPE_OPEN_DISTANCE) {
+              setOpenChatId(chat.id);
+            } else {
+              setOpenChatId(null);
+            }
+            startXRef.current = 0;
+            deltaXRef.current = 0;
+          };
 
           return (
             <div
               key={chat.id}
-              className={`relative mb-3 rounded-2xl transition group
-                ${
-                  selectedChatId === chat.id
-                    ? 'bg-white shadow ring-2 ring-indigo-400'
-                    : 'bg-white hover:shadow-md'
-                }`}
+              className="relative mb-3 overflow-hidden rounded-2xl"
             >
-              <button
-                onClick={() => onSelectChat(chat.id, otherUser)}
-                className="w-full p-3 text-left"
+              {/* 🔴 Delete layer */}
+              <div className="absolute inset-y-0 right-0 w-20 bg-red-500 flex items-center justify-center">
+                <button
+                  onClick={(e) => handleDeleteChat(chat.id, e)}
+                  disabled={deletingChatId === chat.id}
+                  className="w-12 h-12 flex items-center justify-center rounded-full bg-red-600 hover:bg-red-700 transition"
+                  title="Xóa cuộc trò chuyện"
+                >
+                  <Trash2 size={22} className="text-white" />
+                </button>
+              </div>
+
+              {/* 👉 Swipe content */}
+              <div
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerLeave={handlePointerUp}
+                className={`relative bg-white transition-transform duration-200 ease-out
+                  ${isOpen ? `-translate-x-[${SWIPE_WIDTH}px]` : 'translate-x-0'}
+                  ${
+                    selectedChatId === chat.id
+                      ? 'ring-2 ring-indigo-400'
+                      : ''
+                  }
+                `}
+                style={{
+                  transform: isOpen
+                    ? `translateX(-${SWIPE_WIDTH}px)`
+                    : 'translateX(0)',
+                }}
               >
-                <div className="flex items-center gap-3">
-                  {otherUser?.photoURL ? (
-                    <img
-                      src={otherUser.photoURL}
-                      alt={otherUser.displayName}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                      {getInitials(
-                        otherUser?.displayName || otherUser?.email || 'U'
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-slate-800 truncate">
-                      {otherUser?.displayName ||
-                        otherUser?.email ||
-                        'Người dùng'}
-                    </div>
-
-                    <div className="text-xs text-slate-400 truncate">
-                      {chat.lastMessage || 'Chưa có tin nhắn'}
-                    </div>
-
-                    {chat.updatedAt && (
-                      <div className="text-[11px] text-slate-400 mt-1">
-                        {formatTimestamp(chat.updatedAt)}
+                <button
+                  onClick={() => {
+                    setOpenChatId(null);
+                    onSelectChat(chat.id, otherUser);
+                  }}
+                  className="w-full p-3 text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    {otherUser?.photoURL ? (
+                      <img
+                        src={otherUser.photoURL}
+                        alt={otherUser.displayName}
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
+                        {getInitials(
+                          otherUser?.displayName ||
+                            otherUser?.email ||
+                            'U'
+                        )}
                       </div>
                     )}
-                  </div>
-                </div>
-              </button>
 
-              {/* 🗑️ Delete */}
-              <button
-                onClick={(e) => handleDeleteChat(chat.id, e)}
-                disabled={deletingChatId === chat.id}
-                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50"
-                title="Xóa cuộc trò chuyện"
-              >
-                {deletingChatId === chat.id ? '...' : '🗑️'}
-              </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-slate-800 truncate">
+                        {otherUser?.displayName ||
+                          otherUser?.email ||
+                          'Người dùng'}
+                      </div>
+
+                      <div className="text-xs text-slate-400 truncate">
+                        {chat.lastMessage || 'Chưa có tin nhắn'}
+                      </div>
+
+                      {chat.updatedAt && (
+                        <div className="text-[11px] text-slate-400 mt-1">
+                          {formatTimestamp(chat.updatedAt)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              </div>
             </div>
           );
         })}
