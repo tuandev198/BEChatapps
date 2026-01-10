@@ -6,11 +6,15 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { formatTimestamp, getInitials } from '../utils/helpers.js';
 import { SkeletonLoader } from './Loading.jsx';
 
-const MIN_LOADING_TIME = 1200;
+/* ⏱ UX delay config */
+const FIRST_LOAD_DELAY = 700;   // lần đầu mở app
+const NEXT_LOAD_DELAY = 120;    // các lần sau (rất nhanh)
+
+/* Swipe config */
 const SWIPE_WIDTH = 80;
 const SWIPE_OPEN_DISTANCE = 50;
 
-// iOS spring curve
+/* iOS spring */
 const SPRING_OPEN = 'cubic-bezier(0.22, 1.61, 0.36, 1)';
 const SPRING_CLOSE = 'cubic-bezier(0.34, 1.56, 0.64, 1)';
 
@@ -21,12 +25,13 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
   const [chatUsers, setChatUsers] = useState({});
   const [loading, setLoading] = useState(true);
   const [deletingChatId, setDeletingChatId] = useState(null);
-
   const [openChatId, setOpenChatId] = useState(null);
 
   const startXRef = useRef(0);
   const deltaXRef = useRef(0);
+
   const usersCacheRef = useRef({});
+  const hasLoadedOnceRef = useRef(false);
 
   useEffect(() => {
     if (!user) {
@@ -44,29 +49,47 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     const unsubscribe = listenToChats(user.uid, async (list) => {
       if (!isMounted) return;
 
-      const safeChats = Array.isArray(list) ? list : [];
+      try {
+        const safeChats = Array.isArray(list) ? list : [];
 
-      const finish = () => {
-        if (!isMounted) return;
-        setChats(safeChats);
-        setLoading(false);
-      };
+        /* ⏳ delay thông minh */
+        const minDelay = hasLoadedOnceRef.current
+          ? NEXT_LOAD_DELAY
+          : FIRST_LOAD_DELAY;
 
-      const remain = MIN_LOADING_TIME - (Date.now() - startTime);
-      remain > 0 ? setTimeout(finish, remain) : finish();
+        const finish = () => {
+          if (!isMounted) return;
+          setChats(safeChats);
+          setLoading(false);
+        };
 
-      const usersMap = { ...usersCacheRef.current };
-      await Promise.all(
-        safeChats.map(async (c) => {
-          if (!c.otherUid || usersMap[c.otherUid]) return;
-          const u = await getUserById(c.otherUid);
-          if (u) usersMap[c.otherUid] = u;
-        })
-      );
+        const remain = minDelay - (Date.now() - startTime);
+        remain > 0 ? setTimeout(finish, remain) : finish();
+        hasLoadedOnceRef.current = true;
 
-      if (isMounted) {
-        usersCacheRef.current = usersMap;
-        setChatUsers(usersMap);
+        /* 👤 fetch user (có cache) */
+        const usersMap = { ...usersCacheRef.current };
+
+        await Promise.all(
+          safeChats.map(async (chat) => {
+            if (!chat.otherUid || usersMap[chat.otherUid]) return;
+            try {
+              const u = await getUserById(chat.otherUid);
+              if (u) usersMap[chat.otherUid] = u;
+            } catch {}
+          })
+        );
+
+        if (isMounted) {
+          usersCacheRef.current = usersMap;
+          setChatUsers(usersMap);
+        }
+      } catch (err) {
+        console.error(err);
+        if (isMounted) {
+          setChats([]);
+          setLoading(false);
+        }
       }
     });
 
@@ -76,16 +99,21 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     };
   }, [user]);
 
+  /* 🗑️ Delete */
   const handleDeleteChat = async (chatId, e) => {
     e.stopPropagation();
     if (!confirm('Bạn có chắc muốn xóa cuộc trò chuyện này?')) return;
 
     setDeletingChatId(chatId);
-    await deleteChat(chatId, user.uid);
-    setDeletingChatId(null);
-    setOpenChatId(null);
+    try {
+      await deleteChat(chatId, user.uid);
+      setOpenChatId(null);
+    } finally {
+      setDeletingChatId(null);
+    }
   };
 
+  /* ⏳ Loading */
   if (loading || chats === null) {
     return (
       <div className="p-4 space-y-3">
@@ -98,6 +126,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     );
   }
 
+  /* 📭 Empty */
   if (chats.length === 0) {
     return (
       <div className="p-4 text-center text-slate-400 text-sm">
@@ -106,6 +135,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
     );
   }
 
+  /* ✅ List */
   return (
     <div className="flex-1 overflow-y-auto bg-[#F6F5FB] px-3 py-4">
       {chats
@@ -126,7 +156,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
             deltaXRef.current = delta;
 
             if (delta < 0) {
-              const x = Math.max(delta, -SWIPE_WIDTH - 20); // rubber band
+              const x = Math.max(delta, -SWIPE_WIDTH - 20);
               e.currentTarget.style.transform = `translateX(${x}px)`;
             }
           };
@@ -135,7 +165,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
             const open = deltaXRef.current < -SWIPE_OPEN_DISTANCE;
             setOpenChatId(open ? chat.id : null);
 
-            e.currentTarget.style.transition = `transform 0.38s ${
+            e.currentTarget.style.transition = `transform 0.35s ${
               open ? SPRING_OPEN : SPRING_CLOSE
             }`;
 
@@ -173,7 +203,7 @@ export default function ChatList({ onSelectChat, selectedChatId }) {
                   transform: isOpen
                     ? `translateX(-${SWIPE_WIDTH}px)`
                     : 'translateX(0)',
-                  transition: `transform 0.38s ${SPRING_OPEN}`
+                  transition: `transform 0.35s ${SPRING_OPEN}`
                 }}
               >
                 <button
